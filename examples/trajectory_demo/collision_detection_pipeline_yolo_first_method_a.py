@@ -78,6 +78,9 @@ class YOLOFirstPipelineA:
         self.H = None
         self.pixel_per_meter = 1.0
         
+        # 初始化配置对象（用于YAML配置）
+        self.config = None
+        
         # 创建带时间戳的输出目录
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         self.run_dir = (self.output_base / f"{timestamp}_yolo_first_method_a").resolve()
@@ -99,6 +102,49 @@ class YOLOFirstPipelineA:
         print(f"时间戳: {timestamp}")
         print(f"结果目录: {self.run_dir}")
         print(f"执行顺序: YOLO → 轨迹(px) → 关键帧 → Homography(关键帧) → TTC")
+    
+    @classmethod
+    def from_config(cls, config_path):
+        """从YAML配置文件创建pipeline实例
+        
+        Args:
+            config_path: YAML配置文件路径
+        
+        Returns:
+            YOLOFirstMethodA实例
+        """
+        from config_loader import ConfigLoader
+        
+        config = ConfigLoader(config_path)
+        
+        # 获取homography矩阵或计算
+        H = None
+        if config.homography.enabled:
+            try:
+                H, scale = config.get_homography_matrix()
+            except Exception as e:
+                print(f"  ⚠️  无法加载/计算homography: {e}")
+        
+        # 创建pipeline实例
+        pipeline = cls(
+            video_path=config.video.path,
+            homography_path=None,  # 我们直接使用H矩阵，不需要路径
+            output_base=config.output.output_dir,
+            skip_frames=config.yolo.skip_frames,
+            model=config.yolo.model,
+            min_track_length=config.advanced.min_track_length
+        )
+        
+        # 保存配置对象和homography矩阵
+        pipeline.config = config
+        if H is not None:
+            pipeline.H = H
+            pipeline.pixel_per_meter = scale
+        
+        # 打印配置摘要
+        config.print_config()
+        
+        return pipeline
     
     def load_homography(self):
         """加载 Homography 矩阵 (Step 4 需要)"""
