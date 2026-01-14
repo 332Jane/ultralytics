@@ -37,29 +37,34 @@ class VehicleAnchors:
     
     @staticmethod
     def get_anchors(bbox_xywh: List[float], 
-                    object_class: int) -> Dict[str, Tuple[float, float]]:
+                    object_class: int,
+                    vertex_shrink: float = 0.75) -> Dict[str, Tuple[float, float]]:
         """
         Generate anchor points from bounding box in xywh format.
         
         Args:
             bbox_xywh: [center_x, center_y, width, height]
             object_class: COCO class ID
+            vertex_shrink: Shrinking factor for vertices (0.75 = 3/4, brings vertices closer to center)
         
         Returns:
             Dictionary of anchor_name -> (x, y) position
         """
         x, y, w, h = bbox_xywh
+        # Compute shrunken half-widths and half-heights
+        w_half_shrunk = (w / 2) * vertex_shrink
+        h_half_shrunk = (h / 2) * vertex_shrink
         
         if object_class in VehicleAnchors.VEHICLE_CLASSES:
             return {
-                'front_center': (x, y + h/2),
-                'front_left': (x - w/2, y + h/2),
-                'front_right': (x + w/2, y + h/2),
-                'rear_center': (x, y - h/2),
-                'rear_left': (x - w/2, y - h/2),
-                'rear_right': (x + w/2, y - h/2),
-                'left_center': (x - w/2, y),
-                'right_center': (x + w/2, y),
+                'front_center': (x, y + h_half_shrunk),
+                'front_left': (x - w_half_shrunk, y + h_half_shrunk),
+                'front_right': (x + w_half_shrunk, y + h_half_shrunk),
+                'rear_center': (x, y - h_half_shrunk),
+                'rear_left': (x - w_half_shrunk, y - h_half_shrunk),
+                'rear_right': (x + w_half_shrunk, y - h_half_shrunk),
+                'left_center': (x - w_half_shrunk, y),
+                'right_center': (x + w_half_shrunk, y),
             }
         elif object_class == 0:  # person
             return PedestrianAnchors.get_anchors(bbox_xywh)
@@ -69,12 +74,14 @@ class VehicleAnchors:
             return MotorcycleAnchors.get_anchors(bbox_xywh)
         else:
             # Default: use 5 anchor points (center + corners)
+            w_half_shrunk = (w / 2) * vertex_shrink
+            h_half_shrunk = (h / 2) * vertex_shrink
             return {
                 'center': (x, y),
-                'top_left': (x - w/2, y - h/2),
-                'top_right': (x + w/2, y - h/2),
-                'bottom_left': (x - w/2, y + h/2),
-                'bottom_right': (x + w/2, y + h/2),
+                'top_left': (x - w_half_shrunk, y - h_half_shrunk),
+                'top_right': (x + w_half_shrunk, y - h_half_shrunk),
+                'bottom_left': (x - w_half_shrunk, y + h_half_shrunk),
+                'bottom_right': (x + w_half_shrunk, y + h_half_shrunk),
             }
     
     @staticmethod
@@ -106,7 +113,7 @@ class PedestrianAnchors:
     """Pedestrian (person) anchor points."""
     
     @staticmethod
-    def get_anchors(bbox_xywh: List[float]) -> Dict[str, Tuple[float, float]]:
+    def get_anchors(bbox_xywh: List[float], vertex_shrink: float = 0.75) -> Dict[str, Tuple[float, float]]:
         """
         Generate pedestrian anchor points.
         
@@ -117,12 +124,13 @@ class PedestrianAnchors:
         - feet (bottom)
         """
         x, y, w, h = bbox_xywh
+        h_shrunk = h * vertex_shrink
         
         return {
-            'head': (x, y - h/2),           # Top of head
+            'head': (x, y - h/2),           # Top of head (not shrunk)
             'torso': (x, y),                # Main body center
-            'lower': (x, y + h/3),          # Lower body
-            'feet': (x, y + h/2),           # Bottom feet
+            'lower': (x, y + h/3 * vertex_shrink),  # Lower body
+            'feet': (x, y + h/2),           # Bottom feet (not shrunk)
         }
     
     @staticmethod
@@ -141,16 +149,18 @@ class BicycleAnchors:
     """Bicycle anchor points."""
     
     @staticmethod
-    def get_anchors(bbox_xywh: List[float]) -> Dict[str, Tuple[float, float]]:
+    def get_anchors(bbox_xywh: List[float], vertex_shrink: float = 0.75) -> Dict[str, Tuple[float, float]]:
         """Generate bicycle anchor points."""
         x, y, w, h = bbox_xywh
+        w_half_shrunk = (w / 2) * vertex_shrink
+        h_half_shrunk = (h / 2) * vertex_shrink
         
         return {
-            'front': (x, y + h/2),      # Front wheel/handlebars
-            'rear': (x, y - h/2),       # Rear wheel
-            'left': (x - w/2, y),       # Left side
-            'right': (x + w/2, y),      # Right side
-            'center': (x, y),           # Center
+            'front': (x, y + h_half_shrunk),    # Front wheel/handlebars
+            'rear': (x, y - h_half_shrunk),     # Rear wheel
+            'left': (x - w_half_shrunk, y),     # Left side
+            'right': (x + w_half_shrunk, y),    # Right side
+            'center': (x, y),                   # Center
         }
 
 
@@ -158,16 +168,18 @@ class MotorcycleAnchors:
     """Motorcycle anchor points."""
     
     @staticmethod
-    def get_anchors(bbox_xywh: List[float]) -> Dict[str, Tuple[float, float]]:
+    def get_anchors(bbox_xywh: List[float], vertex_shrink: float = 0.75) -> Dict[str, Tuple[float, float]]:
         """Generate motorcycle anchor points (similar to bicycle)."""
         x, y, w, h = bbox_xywh
+        w_half_shrunk = (w / 2) * vertex_shrink
+        h_half_shrunk = (h / 2) * vertex_shrink
         
         return {
-            'front': (x, y + h/2),      # Front
-            'rear': (x, y - h/2),       # Rear
-            'left': (x - w/2, y),       # Left side
-            'right': (x + w/2, y),      # Right side
-            'center': (x, y),           # Center
+            'front': (x, y + h_half_shrunk),    # Front
+            'rear': (x, y - h_half_shrunk),     # Rear
+            'left': (x - w_half_shrunk, y),     # Left side
+            'right': (x + w_half_shrunk, y),    # Right side
+            'center': (x, y),                   # Center
         }
 
 

@@ -171,6 +171,30 @@ class YOLOFirstPipelineA:
         cv2.imwrite(str(output_path), frame)
         return True
     
+    def save_detection_frame_from_array(self, frame_img, frame_num, output_path, boxes, ids, classes):
+        """从frame数组和检测结果绘制并保存检测框"""
+        frame = frame_img.copy()
+        
+        # 绘制检测框
+        for i in range(len(boxes)):
+            x, y, w, h = boxes[i]
+            x1, y1 = int(x - w/2), int(y - h/2)
+            x2, y2 = int(x + w/2), int(y + h/2)
+            
+            # 绘制检测框
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            
+            # 绘制 Track ID
+            track_id = int(ids[i]) if ids[i] is not None else -1
+            text = f"ID:{track_id}"
+            cv2.putText(frame, text, (x1, y1-10), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+        
+        # 保存图像
+        cv2.imwrite(str(output_path), frame)
+        return True
+    
+    
     def save_keyframe_with_distance(self, video_path, frame_num, output_path, proximity_event):
         """保存关键帧图像（绘制两个接近的物体、距离、多锚点碰撞点）"""
         cap = cv2.VideoCapture(video_path)
@@ -372,7 +396,7 @@ class YOLOFirstPipelineA:
                         
                         # 保存检测框图像（每个有检测的帧）
                         frame_img_path = self.detection_dir / f"frame_{frame_count:04d}.jpg"
-                        cv2.imwrite(str(frame_img_path), frame_img)
+                        self.save_detection_frame_from_array(frame_img, frame_count, frame_img_path, boxes, ids, classes)
                     
                     all_detections.append(frame_detections)
                     
@@ -1557,8 +1581,9 @@ class YOLOFirstPipelineA:
     # =========================================================================
     
     def generate_report(self, proximity_events, analyzed_events, level_counts):
-        """生成最终分析报告 (改进版：根据TTC动态分类)"""
+        """生成最终分析报告 (改进版：根据TTC动态分类，包含PDF输出)"""
         report_path = self.analysis_dir / 'analysis_report.txt'
+        pdf_path = self.analysis_dir / 'analysis_report_with_images.pdf'
         
         # 辅助函数：格式化TTC值（支持毫秒显示）
         def format_ttc(ttc_seconds):
@@ -1570,6 +1595,20 @@ class YOLOFirstPipelineA:
                 return f"{ttc_seconds:.4f}s"
             else:  # 大于等于100ms
                 return f"{ttc_seconds:.2f}s"
+        
+        # 辅助函数：查找keyframe图片
+        def find_keyframe(frame_num, track_id_1, track_id_2):
+            """根据frame和两个track_id查找对应的keyframe图片"""
+            keyframes_dir = self.run_dir / '3_key_frames'
+            # 尝试两种ID顺序
+            candidates = [
+                keyframes_dir / f"keyframe_{frame_num:04d}_ID{track_id_1}_ID{track_id_2}.jpg",
+                keyframes_dir / f"keyframe_{frame_num:04d}_ID{track_id_2}_ID{track_id_1}.jpg"
+            ]
+            for candidate in candidates:
+                if candidate.exists():
+                    return candidate
+            return None
         
         with open(report_path, 'w') as f:
             f.write("="*70 + "\n")
@@ -1660,6 +1699,7 @@ class YOLOFirstPipelineA:
                     if 'multi_anchor_detailed' in event:
                         multi_anchor = event['multi_anchor_detailed']
                         ttc = multi_anchor.get('ttc_seconds')
+                        pet = multi_anchor.get('pet_seconds')
                         approaching = multi_anchor.get('heading_analysis', {}).get('approaching', False)
                         
                         if ttc is not None and ttc > 0:
@@ -1671,6 +1711,9 @@ class YOLOFirstPipelineA:
                                 f.write(f"TTC (时间碰撞): 无法计算 / Insufficient Speed\n")
                             else:
                                 f.write(f"TTC (时间碰撞): 远离 / Separating\n")
+                        
+                        if pet is not None and pet > 0:
+                            f.write(f"PET (近距离通过时间): {pet:.4f}s\n")
                         
                         closest_parts = multi_anchor.get('closest_parts', {})
                         if 'description' in closest_parts:
@@ -1686,6 +1729,39 @@ class YOLOFirstPipelineA:
             
             f.write("="*70 + "\n\n")
             
+            # 显示被过滤的事件（平行、远离等）
+            if ttc_classified['filtered']:
+                f.write(f"被过滤事件 (物体平行/远离/TTC过长): {len(ttc_classified['filtered'])} 个\n")
+                f.write("（这些事件未纳入高风险列表，原因如下）\n\n")
+                
+                for event in ttc_classified['filtered'][:20]:
+                    f.write(f"Frame {event['frame']} ({event['time']:.2f}s)\n")
+                    obj_ids = event.get('object_ids') or [event.get('track_id_1', -1), event.get('track_id_2', -1)]
+                    f.write(f"  物体ID: {obj_ids}\n")
+                    
+                    # 获取过滤原因
+                    reason = self._get_filter_reason(event)
+                    f.write(f"  过滤原因: {reason}\n")
+                    
+                    if 'multi_anchor_detailed' in event:
+                        multi = event['multi_anchor_detailed']
+                        dist = multi.get('min_distance_meters', 0)
+                        ttc = multi.get('ttc_seconds')
+                        approaching = multi.get('heading_analysis', {}).get('approaching', False)
+                        
+                        f.write(f"  距离: {dist:.3f}m | ")
+                        f.write(f"接近: {'是' if approaching else '否'} | ")
+                        if ttc and ttc > 0:
+                            f.write(f"TTC: {format_ttc(ttc)}")
+                        f.write("\n")
+                    
+                    f.write("\n")
+                
+                if len(ttc_classified['filtered']) > 20:
+                    f.write(f"  ... 还有 {len(ttc_classified['filtered']) - 20} 个被过滤事件\n\n")
+            
+            f.write("\n" + "="*70 + "\n\n")
+            
             # TTC 分级标准表
             f.write("TTC (时间碰撞) 分级标准参考:\n\n")
             f.write("┌─────────────────┬──────────────────┬──────────────────┐\n")
@@ -1698,10 +1774,135 @@ class YOLOFirstPipelineA:
             f.write("│ (侧面碰撞)      │ General conflict │ 2.3 – 4.2 s      │\n")
             f.write("└─────────────────┴──────────────────┴──────────────────┘\n\n")
             
+            f.write("过滤策略:\n")
+            f.write("  1. 物体远离（距离增加）: 不计入高风险事件\n")
+            f.write("  2. 物体速度平行或同速: 无有效TTC，不计入高风险事件\n")
+            f.write("  3. TTC过长（Rear-end>4.7s / Sideswipe>4.2s）: 风险较低，不计入高风险事件\n")
+            f.write("  4. 高风险事件: 仅包括TTC在分级标准范围内且物体真正接近的事件\n\n")
+            
             f.write("="*70 + "\n")
             f.write("报告结束\n")
         
         print(f"\n  ✓ 报告已保存: {report_path.name}")
+        
+        # 生成包含图片的PDF报告
+        self._generate_pdf_report(analyzed_events, ttc_classified, pdf_path, find_keyframe, format_ttc)
+    
+    def _generate_pdf_report(self, analyzed_events, ttc_classified, pdf_path, find_keyframe_func, format_ttc_func):
+        """生成包含图片的PDF报告"""
+        try:
+            from reportlab.lib.pagesizes import letter, A4
+            from reportlab.lib.units import inch
+            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak, Image, Table, TableStyle
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+            from reportlab.lib.enums import TA_CENTER, TA_LEFT
+            from reportlab.lib import colors
+            
+            # 创建PDF文档
+            doc = SimpleDocTemplate(str(pdf_path), pagesize=A4, topMargin=0.5*inch, bottomMargin=0.5*inch)
+            story = []
+            styles = getSampleStyleSheet()
+            
+            # 自定义样式
+            title_style = ParagraphStyle(
+                'CustomTitle',
+                parent=styles['Heading1'],
+                fontSize=16,
+                textColor=colors.HexColor('#000000'),
+                spaceAfter=10,
+                alignment=TA_CENTER
+            )
+            
+            heading_style = ParagraphStyle(
+                'CustomHeading',
+                parent=styles['Heading2'],
+                fontSize=12,
+                textColor=colors.HexColor('#1a1a1a'),
+                spaceAfter=8
+            )
+            
+            # 添加标题
+            from datetime import datetime
+            story.append(Paragraph("碰撞检测分析报告（含图片）", title_style))
+            story.append(Paragraph(f"生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", styles['Normal']))
+            story.append(Spacer(1, 0.3*inch))
+            
+            # 添加高风险事件和对应的keyframe图片
+            all_high_risk = (ttc_classified.get('rear_end_serious', []) + 
+                            ttc_classified.get('rear_end_general', []) +
+                            ttc_classified.get('sideswipe_serious', []) +
+                            ttc_classified.get('sideswipe_general', []))
+            
+            if all_high_risk:
+                story.append(Paragraph("高风险碰撞事件", heading_style))
+                story.append(Spacer(1, 0.2*inch))
+                
+                for idx, event in enumerate(all_high_risk[:10], 1):  # 最多显示10个
+                    frame = event['frame']
+                    ttc = event['multi_anchor_detailed'].get('ttc_seconds')
+                    dist = event['multi_anchor_detailed'].get('min_distance_meters', 0)
+                    track_id_1 = event.get('track_id_1', -1)
+                    track_id_2 = event.get('track_id_2', -1)
+                    
+                    # 添加事件信息
+                    ttc_str = format_ttc_func(ttc) if ttc and ttc > 0 else "远离"
+                    event_text = f"Frame {frame}: ID{track_id_1}+ID{track_id_2} | TTC={ttc_str} | 距离={dist:.2f}m"
+                    story.append(Paragraph(event_text, styles['Normal']))
+                    
+                    # 查找并添加keyframe图片
+                    keyframe_path = find_keyframe_func(frame, track_id_1, track_id_2)
+                    if keyframe_path and keyframe_path.exists():
+                        try:
+                            img = Image(str(keyframe_path), width=6*inch, height=4.5*inch)
+                            story.append(img)
+                        except Exception as e:
+                            story.append(Paragraph(f"[无法加载图片: {keyframe_path.name}]", styles['Normal']))
+                    else:
+                        story.append(Paragraph(f"[未找到keyframe图片]", styles['Normal']))
+                    
+                    story.append(Spacer(1, 0.2*inch))
+                    
+                    # 每3个事件后添加分页
+                    if (idx) % 3 == 0:
+                        story.append(PageBreak())
+            
+            # 构建PDF
+            doc.build(story)
+            print(f"  ✓ PDF报告已保存: {pdf_path.name}")
+            
+        except ImportError:
+            print(f"  ⚠️  缺少reportlab库，跳过PDF生成。可运行: pip install reportlab")
+        except Exception as e:
+            print(f"  ⚠️  PDF生成失败: {e}")
+    
+    def _get_filter_reason(self, event):
+        """获取事件被过滤的原因"""
+        if 'multi_anchor_detailed' not in event:
+            return "无多锚点数据"
+        
+        multi = event['multi_anchor_detailed']
+        ttc = multi.get('ttc_seconds')
+        heading_analysis = multi.get('heading_analysis', {})
+        
+        # 检查是否接近
+        if not heading_analysis.get('approaching', False):
+            return "物体远离（距离增加）"
+        
+        # 检查TTC是否有效
+        if ttc is None or ttc <= 0:
+            return "两物体速度平行或同速（无有效TTC）"
+        
+        # 检查TTC是否过长
+        relative_heading = heading_analysis.get('relative_heading_rad', 0)
+        import math
+        is_sideswipe = abs(relative_heading) > math.pi / 4
+        
+        if is_sideswipe and ttc >= 4.2:
+            return f"侧面碰撞但TTC过长({ttc:.2f}s > 4.2s)"
+        elif not is_sideswipe and ttc >= 4.7:
+            return f"追尾但TTC过长({ttc:.2f}s > 4.7s)"
+        
+        return "其他"
     
     def _classify_events_by_ttc(self, analyzed_events):
         """根据TTC值和相对方向判断碰撞类型和严重程度"""
@@ -1710,23 +1911,25 @@ class YOLOFirstPipelineA:
             'rear_end_general': [],      # TTC 2.8-4.7s
             'sideswipe_serious': [],     # TTC 0-2.3s
             'sideswipe_general': [],     # TTC 2.3-4.2s
-            'no_ttc': []                 # 没有有效TTC
+            'filtered': []               # 被过滤的事件（平行、远离等）
         }
         
         for event in analyzed_events:
             if 'multi_anchor_detailed' not in event:
-                classified['no_ttc'].append(event)
+                classified['filtered'].append(event)
                 continue
             
+            heading_analysis = event['multi_anchor_detailed'].get('heading_analysis', {})
+            approaching = heading_analysis.get('approaching', False)
             ttc = event['multi_anchor_detailed'].get('ttc_seconds')
-            if ttc is None or ttc <= 0:
-                classified['no_ttc'].append(event)
+            
+            # 判断是否真正接近且有有效TTC
+            if not approaching or ttc is None or ttc <= 0:
+                classified['filtered'].append(event)
                 continue
             
             # 根据相对heading判断是rear-end还是sideswipe
-            # heading接近0或π = rear-end (前后向)
-            # heading接近π/2或-π/2 = sideswipe (侧向)
-            relative_heading = event['multi_anchor_detailed'].get('heading_analysis', {}).get('relative_heading_rad', 0)
+            relative_heading = heading_analysis.get('relative_heading_rad', 0)
             
             # 将heading标准化到[-π, π]
             import math
@@ -1740,7 +1943,7 @@ class YOLOFirstPipelineA:
                 elif ttc < 4.2:
                     classified['sideswipe_general'].append(event)
                 else:
-                    classified['no_ttc'].append(event)
+                    classified['filtered'].append(event)
             else:
                 # Rear-end 碰撞
                 if ttc < 2.8:
@@ -1748,7 +1951,7 @@ class YOLOFirstPipelineA:
                 elif ttc < 4.7:
                     classified['rear_end_general'].append(event)
                 else:
-                    classified['no_ttc'].append(event)
+                    classified['filtered'].append(event)
         
         return classified
     
