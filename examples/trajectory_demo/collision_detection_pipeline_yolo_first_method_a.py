@@ -2262,7 +2262,9 @@ class YOLOFirstPipelineA:
                 # Step 3.5: 同类别物体误检过滤 ✨ 新增
                 filtered_events = self.filter_same_class_false_positives(proximity_events, same_class_distance_threshold=0.3)
                 
-                # 注意：不在这里清理keyframe图片，因为后续Step 3.6需要重新绘制
+                # 清理Step 3.5后被过滤的keyframe图片
+                if len(filtered_events) < len(proximity_events):
+                    self.cleanup_filtered_keyframes(proximity_events, filtered_events)
                 
                 # Step 3.6: 多锚点碰撞分析 (仅关键帧)
                 try:
