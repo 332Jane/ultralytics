@@ -182,6 +182,183 @@ class YOLOFirstPipelineA:
             print(f"  ❌ 加载Homography失败: {e}")
             return False
     
+    def visualize_homography_calibration(self):
+        """可视化Homography标定：分别保存原始帧和变换后的帧
+        
+        从YAML配置中读取标定点信息，在视频第一帧上标记这些点，
+        然后使用Homography矩阵进行透视变换，展示变换效果
+        """
+        if self.H is None:
+            return  # 如果没有Homography矩阵，不需要可视化
+        
+        if self.config is None:
+            return  # 如果没有config对象，无法获取标定点信息
+        
+        print(f"\n【Homography 标定可视化】")
+        
+        try:
+            # 获取第一帧
+            cap = cv2.VideoCapture(self.video_path)
+            ret, frame_original = cap.read()
+            cap.release()
+            
+            if not ret:
+                print(f"  ⚠️  无法读取视频第一帧")
+                return
+            
+            frame_height, frame_width = frame_original.shape[:2]
+            
+            # ===== 图1：原始帧 + 标定点标记 =====
+            frame_with_points = frame_original.copy()
+            
+            # 从config中获取标定点
+            calibration_points = self.config.homography.calibration_points if self.config else []
+            
+            if not calibration_points:
+                print(f"  ⚠️  未找到标定点信息")
+                return
+            
+            # 在原始帧上绘制标定点
+            pixel_points_list = []
+            world_points_list = []
+            
+            for i, point in enumerate(calibration_points):
+                # point是字典，从字典中提取坐标
+                if isinstance(point, dict):
+                    pixel_coords = point.get('pixel_coordinates', point.get('pixel', [0, 0]))
+                    world_coords = point.get('world_coordinates', point.get('world', [0, 0]))
+                    name = point.get('name', f'Point{i+1}')
+                else:
+                    # 如果是对象，尝试访问属性
+                    pixel_coords = point.pixel_coordinates
+                    world_coords = point.world_coordinates
+                    name = point.name
+                
+                pixel_x, pixel_y = pixel_coords[0], pixel_coords[1]
+                world_x, world_y = world_coords[0], world_coords[1]
+                
+                pixel_points_list.append([pixel_x, pixel_y])
+                world_points_list.append([world_x, world_y])
+                
+                # 绘制圆点（原始像素坐标）
+                center = (int(pixel_x), int(pixel_y))
+                cv2.circle(frame_with_points, center, 8, (0, 255, 0), -1)      # 实心绿色圆
+                cv2.circle(frame_with_points, center, 8, (0, 0, 255), 2)       # 红色边框
+                
+                # 绘制文字标签（点名称和世界坐标）
+                label = f"{name} ({world_x:.2f}, {world_y:.2f}m)"
+                cv2.putText(frame_with_points, label, 
+                           (int(pixel_x)+15, int(pixel_y)-10),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                
+                # 编号
+                cv2.putText(frame_with_points, f"#{i+1}", 
+                           (int(pixel_x)-8, int(pixel_y)+8),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 0), 1)
+            
+            # 在原始帧上添加标题和说明
+            cv2.putText(frame_with_points, "Original Frame (Pixel Coordinates)", 
+                       (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 0), 2)
+            cv2.putText(frame_with_points, f"Calibration Points: {len(calibration_points)}", 
+                       (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
+            cv2.putText(frame_with_points, f"Scale: {self.pixel_per_meter:.2f} px/m", 
+                       (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
+            
+            # 保存原始帧
+            original_path = self.homography_dir / '01_original_frame_with_calibration_points.jpg'
+            cv2.imwrite(str(original_path), frame_with_points)
+            
+            # ===== 图2：使用warpPerspective进行透视变换 =====
+            if len(pixel_points_list) >= 4:
+                # 构建透视变换矩阵：从像素坐标到世界坐标的映射
+                # 首先计算输出图像的大小（基于世界坐标范围）
+                world_xs = [p[0] for p in world_points_list]
+                world_ys = [p[1] for p in world_points_list]
+                
+                min_x, max_x = min(world_xs), max(world_xs)
+                min_y, max_y = min(world_ys), max(world_ys)
+                
+                # 添加边距（米）
+                margin = 2
+                min_x -= margin
+                max_x += margin
+                min_y -= margin
+                max_y += margin
+                
+                # 输出图像尺寸：基于世界坐标的宽高比，限制为800px宽
+                output_width = 800
+                world_aspect = (max_x - min_x) / (max_y - min_y) if (max_y - min_y) > 0 else 1
+                output_height = int(output_width / world_aspect)
+                
+                # 限制最大高度
+                max_allowed_height = 1200
+                if output_height > max_allowed_height:
+                    output_height = max_allowed_height
+                    output_width = int(output_height * world_aspect)
+                
+                # 构建源点（像素坐标）和目标点（输出图像中的世界坐标映射）
+                src_pts = np.array(pixel_points_list, dtype=np.float32)
+                dst_pts = np.array([
+                    [(world_x - min_x) / (max_x - min_x) * output_width, 
+                     (world_y - min_y) / (max_y - min_y) * output_height]
+                    for world_x, world_y in world_points_list
+                ], dtype=np.float32)
+                
+                # 计算透视变换矩阵（像素→输出世界坐标）
+                H_warp = cv2.getPerspectiveTransform(src_pts, dst_pts)
+                
+                # 应用warpPerspective进行变换
+                frame_warped = cv2.warpPerspective(frame_original, H_warp,
+                                                   (output_width, output_height),
+                                                   flags=cv2.INTER_LINEAR,
+                                                   borderMode=cv2.BORDER_CONSTANT,
+                                                   borderValue=(200, 200, 200))
+                
+                # 在变换后的帧上标记标定点
+                for i, (world_x, world_y) in enumerate(world_points_list):
+                    # 映射世界坐标到输出图像像素坐标
+                    out_x = int((world_x - min_x) / (max_x - min_x) * output_width)
+                    out_y = int((world_y - min_y) / (max_y - min_y) * output_height)
+                    
+                    # 只在有效范围内绘制
+                    if 0 <= out_x < output_width and 0 <= out_y < output_height:
+                        center = (out_x, out_y)
+                        # 绘制圆点
+                        cv2.circle(frame_warped, center, 8, (0, 255, 0), -1)      # 实心绿色圆
+                        cv2.circle(frame_warped, center, 8, (0, 0, 255), 2)       # 红色边框
+                        
+                        # 绘制编号
+                        cv2.putText(frame_warped, f"#{i+1}", 
+                                   (out_x-8, out_y+8),
+                                   cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 0), 1)
+                
+                # 添加标题和说明
+                cv2.putText(frame_warped, "Homography Transformed Frame (Bird's Eye View)", 
+                           (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 0), 2)
+                cv2.putText(frame_warped, f"World Range: X=[{min_x:.1f}, {max_x:.1f}]m, Y=[{min_y:.1f}, {max_y:.1f}]m", 
+                           (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
+                
+                # 保存变换后的帧
+                transformed_path = self.homography_dir / '02_homography_transformed_frame.jpg'
+                cv2.imwrite(str(transformed_path), frame_warped)
+                
+                print(f"  ✓ Homography标定可视化已保存")
+                print(f"    原始帧: {original_path.name}")
+                print(f"    变换帧: {transformed_path.name}")
+                print(f"    标定点数: {len(calibration_points)}")
+                print(f"    像素坐标范围: X=[0, {frame_width}], Y=[0, {frame_height}]")
+                print(f"    世界坐标范围: X=[{min_x:.2f}, {max_x:.2f}]m, Y=[{min_y:.2f}, {max_y:.2f}]m")
+                print(f"    输出图像尺寸: {output_width}x{output_height}")
+            else:
+                print(f"  ⚠️  标定点少于4个，无法进行透视变换")
+                transformed_path = None
+            
+        except Exception as e:
+            print(f"  ⚠️  Homography标定可视化失败: {e}")
+            import traceback
+            traceback.print_exc()
+    
+
     # =========================================================================
     # 可视化和图像保存
     # =========================================================================
@@ -2029,6 +2206,10 @@ class YOLOFirstPipelineA:
                 print(f"\n【Step 0: 加载资源】")
                 self.load_homography()
             
+            # Step 0.5: Homography 标定可视化（如果使用YAML配置）
+            if self.H is not None and self.config is not None:
+                self.visualize_homography_calibration()
+            
             # Step 1: YOLO 检测
             all_detections = self.run_yolo_detection(conf_threshold)
             
@@ -2081,9 +2262,7 @@ class YOLOFirstPipelineA:
                 # Step 3.5: 同类别物体误检过滤 ✨ 新增
                 filtered_events = self.filter_same_class_false_positives(proximity_events, same_class_distance_threshold=0.3)
                 
-                # 清理：删除被过滤掉的关键帧图片
-                if len(filtered_events) < len(proximity_events):
-                    self.cleanup_filtered_keyframes(proximity_events, filtered_events)
+                # 注意：不在这里清理keyframe图片，因为后续Step 3.6需要重新绘制
                 
                 # Step 3.6: 多锚点碰撞分析 (仅关键帧)
                 try:
@@ -2142,10 +2321,10 @@ class YOLOFirstPipelineA:
                 print(f"  🔍 多锚点距离过滤: 排除 {filtered_count} 个事件")
                 print(f"  ✓ Step 3.7完成: 保留 {len(anchor_filtered_events)} 个关键帧 (≤ 1.0m)")
                 
-                # 清理被过滤掉的关键帧图片
+                # 清理：只保留Step 3.7后被保留的keyframe图片
                 self.cleanup_filtered_keyframes(filtered_events, anchor_filtered_events)
                 
-                # 保存Step 3.7后的最终关键帧JSON
+                # 保存Step 3.7后的最终关键帧JSON（仅包含被保留的事件）
                 events_path = self.keyframe_dir / 'proximity_events.json'
                 with open(events_path, 'w') as f:
                     json.dump(anchor_filtered_events, f, indent=2)
