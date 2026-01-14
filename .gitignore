@@ -1,4 +1,4 @@
-# AI-generated documentation (keep locally, don't push)
+# AI-generated documentation (keep locally, don't push to github)
 METHOD_A_*.md
 YOLO_FIRST_*.md
 TRAJECTORY_VS_*.md
@@ -14,6 +14,11 @@ PROJECT_*.md
 IMPLEMENTATION_*.md
 IMPROVEMENT_*.md
 ANALYSIS_*.md
+
+# Temporary documentation files in examples/trajectory_demo
+examples/trajectory_demo/*.md
+!examples/trajectory_demo/README.md
+!examples/trajectory_demo/INSTALLATION.md
 
 # Results & Outputs
 results/
