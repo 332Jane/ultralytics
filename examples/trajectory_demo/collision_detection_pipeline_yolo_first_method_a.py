@@ -1413,10 +1413,9 @@ class YOLOFirstPipelineA:
         print(f"\n【Step 3.5: 物体误检过滤 (智能策略)】")
         
         # 不合理的类别组合（不可能同时出现且同速运动）
-        # 注意：person与车辆的组合是**合理的**（行人接近车辆是重要的碰撞场景）
-        # 只过滤真正不合理的组合
         illogical_class_combinations = [
             ('person', 'person'),  # 两个人同速移动 = 都在行走，不是真实的接近事件
+            ('person', 'motorcycle'),  # 摩托车驾驶员被检测为两个物体，同速运动
             ('bicycle', 'motorcycle'),  # 自行车和摩托车不会同速运动
         ]
         
