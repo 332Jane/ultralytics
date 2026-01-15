@@ -268,10 +268,9 @@ class YOLOFirstPipelineA:
             original_path = self.homography_dir / '01_original_frame_with_calibration_points.jpg'
             cv2.imwrite(str(original_path), frame_with_points)
             
-            # ===== 图2：使用warpPerspective进行透视变换 =====
+            # ===== 图2：使用原始homography矩阵手工逐像素变换 =====
             if len(pixel_points_list) >= 4:
-                # 构建透视变换矩阵：从像素坐标到世界坐标的映射
-                # 首先计算输出图像的大小（基于世界坐标范围）
+                # 计算世界坐标范围
                 world_xs = [p[0] for p in world_points_list]
                 world_ys = [p[1] for p in world_points_list]
                 
@@ -279,40 +278,59 @@ class YOLOFirstPipelineA:
                 min_y, max_y = min(world_ys), max(world_ys)
                 
                 # 添加边距（米）
-                margin = 2
+                margin = 1.0
                 min_x -= margin
                 max_x += margin
                 min_y -= margin
                 max_y += margin
                 
-                # 输出图像尺寸：基于世界坐标的宽高比，限制为800px宽
-                output_width = 800
-                world_aspect = (max_x - min_x) / (max_y - min_y) if (max_y - min_y) > 0 else 1
-                output_height = int(output_width / world_aspect)
+                # 输出图像尺寸：使用实际的像素/米比例
+                output_width = int((max_x - min_x) * self.pixel_per_meter)
+                output_height = int((max_y - min_y) * self.pixel_per_meter)
                 
-                # 限制最大高度
-                max_allowed_height = 1200
-                if output_height > max_allowed_height:
-                    output_height = max_allowed_height
-                    output_width = int(output_height * world_aspect)
+                # 确保尺寸合理（最小100x100，最大1200x1200）
+                output_width = max(100, min(output_width, 1200))
+                output_height = max(100, min(output_height, 1200))
                 
-                # 构建源点（像素坐标）和目标点（输出图像中的世界坐标映射）
-                src_pts = np.array(pixel_points_list, dtype=np.float32)
-                dst_pts = np.array([
-                    [(world_x - min_x) / (max_x - min_x) * output_width, 
-                     (world_y - min_y) / (max_y - min_y) * output_height]
-                    for world_x, world_y in world_points_list
-                ], dtype=np.float32)
+                # 手工逐像素变换：对于输出图像中的每个像素，反向变换到原始帧采样
+                frame_warped = np.ones((output_height, output_width, 3), dtype=np.uint8) * 200  # 灰色背景
                 
-                # 计算透视变换矩阵（像素→输出世界坐标）
-                H_warp = cv2.getPerspectiveTransform(src_pts, dst_pts)
+                # 计算逆矩阵用于反向变换（从世界坐标回到像素坐标）
+                try:
+                    _, H_inv = cv2.invert(self.H)
+                except:
+                    H_inv = np.linalg.inv(self.H)
                 
-                # 应用warpPerspective进行变换
-                frame_warped = cv2.warpPerspective(frame_original, H_warp,
-                                                   (output_width, output_height),
-                                                   flags=cv2.INTER_LINEAR,
-                                                   borderMode=cv2.BORDER_CONSTANT,
-                                                   borderValue=(200, 200, 200))
+                # 逐像素填充（优化：每行处理一次而不是逐像素）
+                for out_y in range(output_height):
+                    for out_x in range(output_width):
+                        # 将输出像素坐标映射回世界坐标
+                        world_x = min_x + (out_x / output_width) * (max_x - min_x)
+                        world_y = min_y + (out_y / output_height) * (max_y - min_y)
+                        
+                        # 使用逆矩阵反向变换到原始帧的像素坐标
+                        world_pt = np.array([[[world_x, world_y]]], dtype=np.float32)
+                        try:
+                            pixel_pt = cv2.perspectiveTransform(world_pt, H_inv)[0, 0]
+                            px, py = pixel_pt[0], pixel_pt[1]
+                            
+                            # 双线性插值采样
+                            if 0 <= px < frame_width-1 and 0 <= py < frame_height-1:
+                                x0, y0 = int(px), int(py)
+                                x1, y1 = min(x0 + 1, frame_width-1), min(y0 + 1, frame_height-1)
+                                
+                                # 权重
+                                wx = px - x0
+                                wy = py - y0
+                                
+                                # 采样四个相邻像素进行双线性插值
+                                val = (frame_original[y0, x0] * (1-wx) * (1-wy) +
+                                      frame_original[y0, x1] * wx * (1-wy) +
+                                      frame_original[y1, x0] * (1-wx) * wy +
+                                      frame_original[y1, x1] * wx * wy)
+                                frame_warped[out_y, out_x] = val.astype(np.uint8)
+                        except:
+                            pass
                 
                 # 在变换后的帧上标记标定点
                 for i, (world_x, world_y) in enumerate(world_points_list):
@@ -337,6 +355,11 @@ class YOLOFirstPipelineA:
                            (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 0), 2)
                 cv2.putText(frame_warped, f"World Range: X=[{min_x:.1f}, {max_x:.1f}]m, Y=[{min_y:.1f}, {max_y:.1f}]m", 
                            (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
+                cv2.putText(frame_warped, f"Output: {output_width}x{output_height}px ({self.pixel_per_meter:.1f} px/m)", 
+                           (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 0), 1)
+                
+                # 旋转180度（因为homography变换会导致图像上下颠倒）
+                frame_warped = cv2.rotate(frame_warped, cv2.ROTATE_180)
                 
                 # 保存变换后的帧
                 transformed_path = self.homography_dir / '02_homography_transformed_frame.jpg'
@@ -348,7 +371,7 @@ class YOLOFirstPipelineA:
                 print(f"    标定点数: {len(calibration_points)}")
                 print(f"    像素坐标范围: X=[0, {frame_width}], Y=[0, {frame_height}]")
                 print(f"    世界坐标范围: X=[{min_x:.2f}, {max_x:.2f}]m, Y=[{min_y:.2f}, {max_y:.2f}]m")
-                print(f"    输出图像尺寸: {output_width}x{output_height}")
+                print(f"    输出尺寸: {output_width}x{output_height}px ({self.pixel_per_meter:.2f} px/m)")
             else:
                 print(f"  ⚠️  标定点少于4个，无法进行透视变换")
                 transformed_path = None
@@ -1269,6 +1292,9 @@ class YOLOFirstPipelineA:
                             'center_2_px': [float(x2_px), float(y2_px)],
                             'center_1_world': [float(x1_world), float(y1_world)],
                             'center_2_world': [float(x2_world), float(y2_world)],
+                            # 添加bbox大小信息用于后续的bbox相似度过滤
+                            'bbox_1': obj1['bbox_xywh'],  # [x, y, w, h]
+                            'bbox_2': obj2['bbox_xywh'],  # [x, y, w, h]
                             'positions': {
                                 'obj1': {'x': x1_px, 'y': y1_px},
                                 'obj2': {'x': x2_px, 'y': y2_px}
@@ -1458,6 +1484,29 @@ class YOLOFirstPipelineA:
                 filter_reasons.append((frame, tid1, tid2, class_1, class_2, distance, reason))
                 continue
             
+            # 条件1.5: bbox大小相似度过滤 → 同一物体被分割成多个Track ID
+            # 如果两个物体的bbox大小非常相似（比如都是 500x300），且距离近
+            # 这通常表示YOLO把同一物体分割成了两个Track ID
+            bbox_1 = event.get('bbox_1')
+            bbox_2 = event.get('bbox_2')
+            if bbox_1 and bbox_2:
+                w1, h1 = bbox_1[2], bbox_1[3]
+                w2, h2 = bbox_2[2], bbox_2[3]
+                
+                # 计算bbox大小的相似度 (面积相对差异)
+                area_1 = w1 * h1
+                area_2 = w2 * h2
+                area_diff_ratio = abs(area_1 - area_2) / max(area_1, area_2)
+                
+                # 如果面积相差 < 20% 且都是汽车类型，则认为可能是同一物体
+                if (area_diff_ratio < 0.2 and 
+                    class_1 in vehicle_types and class_2 in vehicle_types and
+                    distance < 2.0):  # 距离 < 2.0m
+                    reason = f"bbox相似 (面积相差{area_diff_ratio*100:.1f}% < 20%) + 距离{distance:.3f}m"
+                    filtered_count += 1
+                    filter_reasons.append((frame, tid1, tid2, class_1, class_2, distance, reason))
+                    continue
+            
             # 条件4: 都是汽车类型 + 距离 < 0.5m → 同一车辆的不同部分
             if (class_1 in vehicle_types and class_2 in vehicle_types) and distance < 0.5:
                 reason = f"都是汽车类型 ({class_1}+{class_2}, 距离{distance:.3f}m < 0.5m)"
@@ -1498,6 +1547,7 @@ class YOLOFirstPipelineA:
         
         print(f"  ✓ 过滤完成: 排除了 {filtered_count} 个误检, 保留 {len(filtered_events)} 个事件")
         print(f"    条件1: 距离 < 0.1m")
+        print(f"    条件1.5: bbox面积相似 (< 20% 差异) + 汽车类型 + 距离 < 2.0m")
         print(f"    条件4: 都是汽车类型 (car/truck/bus/motorcycle等) + 距离 < 0.5m")
         print(f"    条件2: 不合理类别组合 (person/motorcycle等) + 距离稳定 (std < 0.5m)")
         print(f"    条件3: Track ID对断断续续出现 + 平均距离 < 2.0m")
