@@ -1485,8 +1485,10 @@ class YOLOFirstPipelineA:
                 continue
             
             # 条件1.5: bbox大小相似度过滤 → 同一物体被分割成多个Track ID
-            # 如果两个物体的bbox大小非常相似（比如都是 500x300），且距离近
-            # 这通常表示YOLO把同一物体分割成了两个Track ID
+            # 只在以下条件同时满足时才认为是同一物体：
+            # - 两个物体的bbox大小非常相似（面积相差 < 15%）
+            # - 都是汽车类型
+            # - 距离非常近 (< 0.3m) - 这样才能确认是同一物体，而不是两辆独立的车
             bbox_1 = event.get('bbox_1')
             bbox_2 = event.get('bbox_2')
             if bbox_1 and bbox_2:
@@ -1498,11 +1500,11 @@ class YOLOFirstPipelineA:
                 area_2 = w2 * h2
                 area_diff_ratio = abs(area_1 - area_2) / max(area_1, area_2)
                 
-                # 如果面积相差 < 20% 且都是汽车类型，则认为可能是同一物体
-                if (area_diff_ratio < 0.2 and 
+                # 只有距离极近 (< 0.3m) 且面积非常相似才认为是同一物体误检
+                if (area_diff_ratio < 0.15 and 
                     class_1 in vehicle_types and class_2 in vehicle_types and
-                    distance < 2.0):  # 距离 < 2.0m
-                    reason = f"bbox相似 (面积相差{area_diff_ratio*100:.1f}% < 20%) + 距离{distance:.3f}m"
+                    distance < 0.3):  # 距离 < 0.3m (非常近)
+                    reason = f"bbox极相似 (面积相差{area_diff_ratio*100:.1f}% < 15%) + 极近{distance:.3f}m < 0.3m"
                     filtered_count += 1
                     filter_reasons.append((frame, tid1, tid2, class_1, class_2, distance, reason))
                     continue
