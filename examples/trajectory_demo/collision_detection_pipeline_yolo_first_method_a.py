@@ -1413,13 +1413,11 @@ class YOLOFirstPipelineA:
         print(f"\n【Step 3.5: 物体误检过滤 (智能策略)】")
         
         # 不合理的类别组合（不可能同时出现且同速运动）
+        # 注意：person与车辆的组合是**合理的**（行人接近车辆是重要的碰撞场景）
+        # 只过滤真正不合理的组合
         illogical_class_combinations = [
-            ('person', 'motorcycle'),
-            ('person', 'car'),
-            ('person', 'truck'),
-            ('person', 'bus'),
-            ('bicycle', 'motorcycle'),
-            ('bicycle', 'car'),
+            ('person', 'person'),  # 两个人同速移动 = 都在行走，不是真实的接近事件
+            ('bicycle', 'motorcycle'),  # 自行车和摩托车不会同速运动
         ]
         
         # 定义汽车类型
@@ -1725,27 +1723,47 @@ class YOLOFirstPipelineA:
         else:
             print(f"  ⚠️  多锚点分析完成: 0/{len(proximity_events)}个关键帧 (无法获取锚点数据或发生错误)")
         
-        # =================================================================
-        # STEP 3.7: 多锚点距离过滤（仅保留距离 ≤ 1.0m 的高风险事件）
-        # =================================================================
-        print(f"\n【Step 3.7: 多锚点距离过滤 (≤1.0m)】")
+        return proximity_events
+    
+    # =================================================================
+# STEP 3.7: 多锚点距离过滤（仅保留距离 ≤ 1.5m 的高风险事件）
+    # =================================================================
+    def filter_by_anchor_distance(self, proximity_events, distance_threshold=1.5):
+        """Step 3.7: 按多锚点距离过滤事件
+        
+        Args:
+            proximity_events: 从Step 3.6得到的事件列表
+            distance_threshold: 距离阈值，默认1.5m
+        
+        Returns:
+            过滤后的事件列表
+        """
+        print(f"\n【Step 3.7: 多锚点距离过滤 (≤{distance_threshold}m)】")
         
         anchor_filtered_events = []
         for event in proximity_events:
             multi = event.get('multi_anchor_detailed', {})
             min_distance = multi.get('min_distance_meters', float('inf'))
             
-            # 保留距离 ≤ 1.0m 的事件（高风险）
-            if min_distance <= 1.0:
+            # 保留距离 ≤ threshold 的事件
+            if min_distance <= distance_threshold:
                 anchor_filtered_events.append(event)
             else:
                 frame = event['frame']
                 tid1, tid2 = event['track_id_1'], event['track_id_2']
-                print(f"  ⊗ 过滤 Frame {frame}: Track {tid1}+{tid2} (锚点距离={min_distance:.2f}m > 1.0m)")
+                print(f"  ⊗ 过滤 Frame {frame}: Track {tid1}+{tid2} (锚点距离={min_distance:.2f}m > {distance_threshold}m)")
         
         filtered_count = len(proximity_events) - len(anchor_filtered_events)
         print(f"  🔍 多锚点距离过滤: 排除 {filtered_count} 个事件")
-        print(f"  ✓ Step 3.7完成: 保留 {len(anchor_filtered_events)} 个关键帧 (≤ 1.0m)")
+        print(f"  ✓ Step 3.7完成: 保留 {len(anchor_filtered_events)} 个关键帧 (≤ {distance_threshold}m)")
+        
+        # 清理被过滤掉的关键帧图片
+        self.cleanup_filtered_keyframes(proximity_events, anchor_filtered_events)
+        
+        # 保存Step 3.7后的最终关键帧JSON
+        events_path = self.keyframe_dir / 'proximity_events.json'
+        with open(events_path, 'w') as f:
+            json.dump(anchor_filtered_events, f, indent=2)
         
         return anchor_filtered_events
     
@@ -2338,53 +2356,9 @@ class YOLOFirstPipelineA:
                     frame_img_path = self.keyframe_dir / f"keyframe_{frame_num:04d}_ID{tid1}_ID{tid2}.jpg"
                     self.save_keyframe_with_distance(self.video_path, frame_num, frame_img_path, event)
                 
-                # STEP 3.7: 多锚点距离过滤（在这里执行，不是在Step 5）
-                print(f"\n【Step 3.7: 多锚点距离过滤 (≤1.0m)】")
-                anchor_filtered_events = []
-                removed_reasons = {'no_anchor_data': [], 'distance_too_far': []}
-                
-                for event in filtered_events:
-                    frame = event['frame']
-                    tid1 = event['track_id_1']
-                    tid2 = event['track_id_2']
-                    
-                    # 检查是否有多锚点分析数据
-                    if 'multi_anchor_detailed' not in event:
-                        removed_reasons['no_anchor_data'].append((frame, tid1, tid2))
-                        continue
-                    
-                    multi = event['multi_anchor_detailed']
-                    min_distance = multi.get('min_distance_meters', float('inf'))
-                    
-                    # 保留距离 ≤ 1.0m 的事件（高风险）
-                    if min_distance <= 1.0:
-                        anchor_filtered_events.append(event)
-                    else:
-                        removed_reasons['distance_too_far'].append((frame, tid1, tid2, min_distance))
-                
-                # 报告被过滤的事件
-                if removed_reasons['no_anchor_data']:
-                    print(f"  ⊗ 移除 {len(removed_reasons['no_anchor_data'])} 个无多锚点数据的事件")
-                
-                if removed_reasons['distance_too_far']:
-                    print(f"  ⊗ 移除 {len(removed_reasons['distance_too_far'])} 个距离>1.0m的事件:")
-                    for frame, tid1, tid2, dist in removed_reasons['distance_too_far']:
-                        print(f"     - Frame {frame}: ID{tid1}+ID{tid2} (锚点距离={dist:.2f}m)")
-                
-                filtered_count = len(filtered_events) - len(anchor_filtered_events)
-                print(f"  🔍 多锚点距离过滤: 排除 {filtered_count} 个事件")
-                print(f"  ✓ Step 3.7完成: 保留 {len(anchor_filtered_events)} 个关键帧 (≤ 1.0m)")
-                
-                # 清理：只保留Step 3.7后被保留的keyframe图片
-                self.cleanup_filtered_keyframes(filtered_events, anchor_filtered_events)
-                
-                # 保存Step 3.7后的最终关键帧JSON（仅包含被保留的事件）
-                events_path = self.keyframe_dir / 'proximity_events.json'
-                with open(events_path, 'w') as f:
-                    json.dump(anchor_filtered_events, f, indent=2)
-                
-                # 用Step 3.7过滤后的事件继续后续步骤
-                filtered_events = anchor_filtered_events
+                # STEP 3.7: 多锚点距离过滤（仅保留距离 ≤ 1.5m 的事件）
+                # 调用单独的过滤函数
+                filtered_events = self.filter_by_anchor_distance(filtered_events)
                 # Step 4: Homography 变换 (仅关键帧)
                 if self.H is not None:
                     transformed_events = self.transform_key_frames_to_world(filtered_events)
