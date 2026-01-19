@@ -5,8 +5,6 @@ This module implements collision risk analysis using multiple anchor points
 on objects, providing more accurate collision detection than center-point
 distance alone.
 
-Author: Cindy
-Date: 2025-01-11
 """
 
 import numpy as np

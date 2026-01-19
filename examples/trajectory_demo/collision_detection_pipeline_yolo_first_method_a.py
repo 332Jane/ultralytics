@@ -81,9 +81,10 @@ class YOLOFirstPipelineA:
         # 初始化配置对象（用于YAML配置）
         self.config = None
         
-        # 创建带时间戳的输出目录
+        # 创建带视频文件名和日期的输出目录
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.run_dir = (self.output_base / f"{timestamp}_yolo_first_method_a").resolve()
+        video_filename = Path(video_path).stem  # 获取视频文件名（不含扩展名）
+        self.run_dir = (self.output_base / f"{video_filename}_{timestamp}_yolo_first_method_a").resolve()
         
         # 创建子目录结构 (Method A)
         self.detection_dir = self.run_dir / "1_yolo_detection"
@@ -331,32 +332,6 @@ class YOLOFirstPipelineA:
                                 frame_warped[out_y, out_x] = val.astype(np.uint8)
                         except:
                             pass
-                
-                # 在变换后的帧上标记标定点
-                for i, (world_x, world_y) in enumerate(world_points_list):
-                    # 映射世界坐标到输出图像像素坐标
-                    out_x = int((world_x - min_x) / (max_x - min_x) * output_width)
-                    out_y = int((world_y - min_y) / (max_y - min_y) * output_height)
-                    
-                    # 只在有效范围内绘制
-                    if 0 <= out_x < output_width and 0 <= out_y < output_height:
-                        center = (out_x, out_y)
-                        # 绘制圆点
-                        cv2.circle(frame_warped, center, 8, (0, 255, 0), -1)      # 实心绿色圆
-                        cv2.circle(frame_warped, center, 8, (0, 0, 255), 2)       # 红色边框
-                        
-                        # 绘制编号
-                        cv2.putText(frame_warped, f"#{i+1}", 
-                                   (out_x-8, out_y+8),
-                                   cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 0), 1)
-                
-                # 添加标题和说明
-                cv2.putText(frame_warped, "Homography Transformed Frame (Bird's Eye View)", 
-                           (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 0), 2)
-                cv2.putText(frame_warped, f"World Range: X=[{min_x:.1f}, {max_x:.1f}]m, Y=[{min_y:.1f}, {max_y:.1f}]m", 
-                           (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
-                cv2.putText(frame_warped, f"Output: {output_width}x{output_height}px ({self.pixel_per_meter:.1f} px/m)", 
-                           (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 0), 1)
                 
                 # 旋转180度（因为homography变换会导致图像上下颠倒）
                 frame_warped = cv2.rotate(frame_warped, cv2.ROTATE_180)

@@ -1,0 +1,79 @@
+{
+  "video_file": "Homograph_Teset_FullScreen.mp4",
+  "annotation_date": "2026-01-19",
+  "annotator": "Cindy",
+  "notes": "Manual ground truth for accuracy validation",
+  
+  "ground_truth_events": [
+    {
+      "frame": 67,
+      "time_seconds": 2.23,
+      "track_ids": [7, 9],
+      "object_types": ["car", "car"],
+      "event_type": "near_miss",
+      "distance_meters": 1.64,
+      "ttc_seconds": null,
+      "is_collision": false,
+      "notes": "Two cars approaching but not critical"
+    },
+    {
+      "frame": 85,
+      "time_seconds": 2.83,
+      "track_ids": [7, 10],
+      "object_types": ["car", "car"],
+      "event_type": "near_miss",
+      "distance_meters": 1.50,
+      "ttc_seconds": 2.1,
+      "is_collision": false,
+      "notes": "Vehicles at threshold distance"
+    },
+    {
+      "frame": 91,
+      "time_seconds": 3.03,
+      "track_ids": [11, 10],
+      "object_types": ["car", "car"],
+      "event_type": "collision_risk",
+      "distance_meters": 0.533,
+      "ttc_seconds": 1.05,
+      "is_collision": false,
+      "notes": "Very close, high TTC risk"
+    },
+    {
+      "frame": 97,
+      "time_seconds": 3.23,
+      "track_ids": [11, 10],
+      "object_types": ["car", "car"],
+      "event_type": "collision_risk",
+      "distance_meters": 0.338,
+      "ttc_seconds": 0.27,
+      "is_collision": true,
+      "notes": "Critical collision risk, very short TTC"
+    }
+  ],
+  
+  "statistics": {
+    "total_annotations": 4,
+    "collision_events": 1,
+    "near_miss_events": 3,
+    "false_positives_in_detection": 7,
+    "notes": "Based on visual inspection of video and algorithm output"
+  },
+  
+  "validation_rules": {
+    "Level_1_Critical": {
+      "definition": "TTC < 1.0s OR distance < 0.5m",
+      "example_frames": [97],
+      "count": 1
+    },
+    "Level_2_NearMiss": {
+      "definition": "0.5m <= distance <= 1.5m AND TTC < 3.0s",
+      "example_frames": [85, 91],
+      "count": 2
+    },
+    "Level_3_Avoidance": {
+      "definition": "distance > 1.5m",
+      "example_frames": [67],
+      "count": 1
+    }
+  }
+}
