@@ -160,19 +160,19 @@ class YOLOFirstPipelineA:
                 H_data = json.load(f)
             
             self.H = np.array(H_data['homography_matrix'], dtype=np.float32)
-            pixel_points = H_data['pixel_points']
-            world_points = H_data['world_points']
+            self.pixel_points = H_data['pixel_points']
+            self.world_points = H_data['world_points']
             
             # 保存到输出目录
             with open(self.homography_dir / 'homography.json', 'w') as f:
                 json.dump(H_data, f, indent=2)
             
             # 计算像素到米的缩放因子
-            if len(world_points) >= 2 and len(pixel_points) >= 2:
-                px_dist = np.sqrt((pixel_points[0][0] - pixel_points[1][0])**2 + 
-                                 (pixel_points[0][1] - pixel_points[1][1])**2)
-                world_dist = np.sqrt((world_points[0][0] - world_points[1][0])**2 + 
-                                    (world_points[0][1] - world_points[1][1])**2)
+            if len(self.world_points) >= 2 and len(self.pixel_points) >= 2:
+                px_dist = np.sqrt((self.pixel_points[0][0] - self.pixel_points[1][0])**2 + 
+                                 (self.pixel_points[0][1] - self.pixel_points[1][1])**2)
+                world_dist = np.sqrt((self.world_points[0][0] - self.world_points[1][0])**2 + 
+                                    (self.world_points[0][1] - self.world_points[1][1])**2)
                 
                 self.pixel_per_meter = px_dist / world_dist if world_dist > 0 else 1.0
             
@@ -1746,12 +1746,12 @@ class YOLOFirstPipelineA:
     # =========================================================================
     
     def transform_key_frames_to_world(self, proximity_events):
-        """Step 4: Homography 信息保存
+        """Step 4: Homography 信息保存 + 第一帧验证图
         
         Warning: Homography transformation already completed in Step 2!
         - Step 2: Trajectory construction + Homography transform -> world coordinates
         - Step 3: Use world coordinates to detect keyframes
-        - Step 4: Only save Homography metadata, no duplicate transform
+        - Step 4: Save Homography metadata + generate first frame verification image
         """
         print(f"\n【Step 4: Homography 信息保存】")
         print(f"  ℹ️  注意: 坐标变换已在Step 2中完成（使用Homography）")
@@ -1766,12 +1766,125 @@ class YOLOFirstPipelineA:
         with open(trans_path, 'w') as f:
             json.dump(proximity_events, f, indent=2)
         
+        # 生成第一帧Homography验证图（逐像素变换）
+        self._generate_first_frame_verification()
+        
         print(f"  ✓ Step 4完成: {len(proximity_events)}个关键帧信息已保存")
         print(f"    缩放因子: {self.pixel_per_meter:.2f} px/m")
         print(f"    坐标系统: 世界坐标 (已在Step 3变换)")
         print(f"    输出: {trans_path.name}")
         
         return proximity_events
+    
+    def _generate_first_frame_verification(self):
+        """生成第一帧Homography逐像素变换验证图，用于验证矩阵正确性
+        使用cv2.getPerspectiveTransform和cv2.warpPerspective（经过验证的方法）"""
+        try:
+            # 读取第一帧
+            cap = cv2.VideoCapture(self.video_path)
+            ret, frame = cap.read()
+            cap.release()
+            
+            if not ret:
+                print(f"  ⚠️  无法读取视频第一帧用于验证")
+                return
+            
+            print(f"  📊 生成第一帧Homography验证图...")
+            
+            # 获取标定点（在加载Homography时已保存）
+            if not hasattr(self, 'world_points') or not self.world_points:
+                print(f"  ⚠️  未找到世界坐标点")
+                return
+            
+            if not hasattr(self, 'pixel_points') or not self.pixel_points:
+                print(f"  ⚠️  未找到像素坐标点")
+                return
+            
+            # 转换为numpy数组
+            world_points_arr = np.array(self.world_points, dtype=np.float32)
+            pixel_points_arr = np.array(self.pixel_points, dtype=np.float32)
+            
+            # 计算世界坐标范围
+            min_x = float(np.min(world_points_arr[:, 0]))
+            max_x = float(np.max(world_points_arr[:, 0]))
+            min_y = float(np.min(world_points_arr[:, 1]))
+            max_y = float(np.max(world_points_arr[:, 1]))
+            
+            # 添加边距
+            margin = 2
+            min_x -= margin
+            max_x += margin
+            min_y -= margin
+            max_y += margin
+            
+            # 计算输出尺寸
+            output_width = 800
+            world_aspect = (max_x - min_x) / (max_y - min_y) if (max_y - min_y) > 0 else 1
+            output_height = int(output_width / world_aspect)
+            
+            # 限制最大高度
+            max_allowed_height = 1200
+            if output_height > max_allowed_height:
+                output_height = max_allowed_height
+                output_width = int(output_height * world_aspect)
+            
+            # 构建透视变换矩阵：从像素坐标到输出世界坐标的映射
+            # cv2.getPerspectiveTransform()只接受恰好4个点
+            src_pts = pixel_points_arr[:4]
+            dst_pts = np.array([
+                [(world_x - min_x) / (max_x - min_x) * output_width, 
+                 (world_y - min_y) / (max_y - min_y) * output_height]
+                for world_x, world_y in world_points_arr[:4]
+            ], dtype=np.float32)
+            
+            # 计算透视变换矩阵（像素→输出世界坐标）
+            H_warp = cv2.getPerspectiveTransform(src_pts, dst_pts)
+            
+            # 应用warpPerspective进行变换
+            frame_warped = cv2.warpPerspective(
+                frame, H_warp,
+                (output_width, output_height),
+                flags=cv2.INTER_LINEAR,
+                borderMode=cv2.BORDER_CONSTANT,
+                borderValue=(200, 200, 200)
+            )
+            
+            # 在变换后的帧上标记标定点
+            for i, (world_x, world_y) in enumerate(world_points_arr):
+                # 映射世界坐标到输出图像像素坐标
+                out_x = int((world_x - min_x) / (max_x - min_x) * output_width)
+                out_y = int((world_y - min_y) / (max_y - min_y) * output_height)
+                
+                # 只在有效范围内绘制
+                if 0 <= out_x < output_width and 0 <= out_y < output_height:
+                    center = (out_x, out_y)
+                    # 绘制圆点
+                    cv2.circle(frame_warped, center, 8, (0, 255, 0), -1)      # 实心绿色圆
+                    cv2.circle(frame_warped, center, 8, (0, 0, 255), 2)       # 红色边框
+                    
+                    # 绘制编号
+                    cv2.putText(frame_warped, f"#{i+1}", 
+                               (out_x-8, out_y+8),
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 0), 1)
+            
+            # 添加标题和说明
+            cv2.putText(frame_warped, "First Frame - Homography Transformed (Bird's Eye View)", 
+                       (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
+            cv2.putText(frame_warped, f"World: X=[{min_x:.1f}, {max_x:.1f}]m, Y=[{min_y:.1f}, {max_y:.1f}]m",
+                       (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
+            cv2.putText(frame_warped, f"Output: {output_width}x{output_height}px | Scale: {self.pixel_per_meter:.2f} px/m",
+                       (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
+            
+            # 保存验证图
+            verify_path = self.homography_dir / '01_first_frame_transformed_verify.jpg'
+            cv2.imwrite(str(verify_path), frame_warped)
+            print(f"    ✓ 第一帧验证图已保存: {verify_path.name}")
+            print(f"      尺寸: {output_width}x{output_height}px | 标定点: {len(self.world_points)}")
+            
+        except Exception as e:
+            print(f"  ⚠️  生成验证图失败: {e}")
+            import traceback
+            traceback.print_exc()
     
     # =========================================================================
     # STEP 5: TTC 和 Event 分级
