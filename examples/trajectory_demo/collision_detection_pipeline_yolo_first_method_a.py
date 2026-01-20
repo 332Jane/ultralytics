@@ -1898,73 +1898,67 @@ class YOLOFirstPipelineA:
             # 根据TTC分类事件
             ttc_classified = self._classify_events_by_ttc(analyzed_events)
             
-            # 输出分类结果
+            # 输出分类结果 - 显示全部事件
             f.write("根据TTC值的碰撞风险分类:\n\n")
             
-            # Rear-end 碰撞
+            # Rear-end 碰撞 - 严重冲突
             if ttc_classified['rear_end_serious']:
                 f.write(f"【Rear-end - Serious Conflict (TTC 0-2.8s)】: {len(ttc_classified['rear_end_serious'])} 个\n")
-                for event in ttc_classified['rear_end_serious'][:5]:
+                for event in ttc_classified['rear_end_serious']:
                     ttc = event['multi_anchor_detailed'].get('ttc_seconds', 0)
                     ttc_str = format_ttc(ttc)
                     f.write(f"  Frame {event['frame']}: TTC={ttc_str}, 距离={event['multi_anchor_detailed'].get('min_distance_meters', 0):.3f}m\n")
-                if len(ttc_classified['rear_end_serious']) > 5:
-                    f.write(f"  ... 还有 {len(ttc_classified['rear_end_serious']) - 5} 个\n")
                 f.write("\n")
             
+            # Rear-end 碰撞 - 一般冲突
             if ttc_classified['rear_end_general']:
                 f.write(f"【Rear-end - General Conflict (TTC 2.8-4.7s)】: {len(ttc_classified['rear_end_general'])} 个\n")
-                for event in ttc_classified['rear_end_general'][:5]:
+                for event in ttc_classified['rear_end_general']:
                     ttc = event['multi_anchor_detailed'].get('ttc_seconds', 0)
                     ttc_str = format_ttc(ttc)
                     f.write(f"  Frame {event['frame']}: TTC={ttc_str}, 距离={event['multi_anchor_detailed'].get('min_distance_meters', 0):.3f}m\n")
-                if len(ttc_classified['rear_end_general']) > 5:
-                    f.write(f"  ... 还有 {len(ttc_classified['rear_end_general']) - 5} 个\n")
                 f.write("\n")
             
-            # Sideswipe 碰撞
+            # Sideswipe 碰撞 - 严重冲突
             if ttc_classified['sideswipe_serious']:
                 f.write(f"【Sideswipe - Serious Conflict (TTC 0-2.3s)】: {len(ttc_classified['sideswipe_serious'])} 个\n")
-                for event in ttc_classified['sideswipe_serious'][:5]:
+                for event in ttc_classified['sideswipe_serious']:
                     ttc = event['multi_anchor_detailed'].get('ttc_seconds', 0)
                     ttc_str = format_ttc(ttc)
                     f.write(f"  Frame {event['frame']}: TTC={ttc_str}, 距离={event['multi_anchor_detailed'].get('min_distance_meters', 0):.3f}m\n")
-                if len(ttc_classified['sideswipe_serious']) > 5:
-                    f.write(f"  ... 还有 {len(ttc_classified['sideswipe_serious']) - 5} 个\n")
                 f.write("\n")
             
+            # Sideswipe 碰撞 - 一般冲突
             if ttc_classified['sideswipe_general']:
                 f.write(f"【Sideswipe - General Conflict (TTC 2.3-4.2s)】: {len(ttc_classified['sideswipe_general'])} 个\n")
-                for event in ttc_classified['sideswipe_general'][:5]:
+                for event in ttc_classified['sideswipe_general']:
                     ttc = event['multi_anchor_detailed'].get('ttc_seconds', 0)
                     ttc_str = format_ttc(ttc)
                     f.write(f"  Frame {event['frame']}: TTC={ttc_str}, 距离={event['multi_anchor_detailed'].get('min_distance_meters', 0):.3f}m\n")
-                if len(ttc_classified['sideswipe_general']) > 5:
-                    f.write(f"  ... 还有 {len(ttc_classified['sideswipe_general']) - 5} 个\n")
                 f.write("\n")
             
-            # PET近距离通过事件（Part 2: 没有撞车风险但危险）
+            # PET近距离通过事件（Part 2: 已分离但曾危险通过）
             if ttc_classified['near_miss_pet']:
                 f.write(f"【Near Miss - Post-Encroachment Time (PET < 1.0s)】: {len(ttc_classified['near_miss_pet'])} 个\n")
                 f.write("（物体已分离，但曾在危险距离内通过，PET值表示逃脱碰撞的时间裕度）\n")
-                for event in ttc_classified['near_miss_pet'][:5]:
+                for event in ttc_classified['near_miss_pet']:
                     pet = event['multi_anchor_detailed'].get('pet_seconds', 0)
                     f.write(f"  Frame {event['frame']}: PET={pet:.4f}s, 距离={event['multi_anchor_detailed'].get('min_distance_meters', 0):.3f}m\n")
-                if len(ttc_classified['near_miss_pet']) > 5:
-                    f.write(f"  ... 还有 {len(ttc_classified['near_miss_pet']) - 5} 个\n")
                 f.write("\n")
             
             if not any([ttc_classified['rear_end_serious'], ttc_classified['rear_end_general'],
                        ttc_classified['sideswipe_serious'], ttc_classified['sideswipe_general']]):
                 f.write("未检测到具有有效TTC值的碰撞事件\n\n")
             
-            f.write("\n前10个高风险事件（详细信息）:\n\n")
+            f.write("\n全部接近事件详细分析 (按风险等级排序):\n")
+            f.write("排序逻辑: Level 1 (碰撞) > Level 2 (近距离通过) > Level 3 (规避)\n")
+            f.write("同等级内按Frame编号升序排列\n\n")
             
             if analyzed_events:
-                sorted_events = sorted(analyzed_events, key=lambda e: e.get('level', 3))
+                sorted_events = sorted(analyzed_events, key=lambda e: (e.get('level', 3), e['frame']))
                 
-                for event in sorted_events[:10]:
-                    f.write(f"Frame {event['frame']} ({event['time']:.2f}s)\n")
+                for idx, event in enumerate(sorted_events, 1):
+                    f.write(f"{idx}. Frame {event['frame']} ({event['time']:.2f}s)\n")
                     obj_ids = event.get('object_ids') or [event.get('track_id_1', -1), event.get('track_id_2', -1)]
                     f.write(f"物体ID: {obj_ids}\n")
                     f.write(f"风险等级: Level {event['level']} ({event.get('level_name', '?')})\n")
