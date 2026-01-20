@@ -1,0 +1,97 @@
+{
+  "video_file": "Homograph_Teset_FullScreen.mp4",
+  "annotation_date": "2026-01-19",
+  "annotator": "Manual inspection based on system output",
+  "validation_method": "Visual inspection + TTC analysis",
+  
+  "ground_truth_events": [
+    {
+      "frame": 67,
+      "time_seconds": 2.23,
+      "track_ids": [7, 9],
+      "object_types": ["car", "car"],
+      "distance_meters": 0.564,
+      "ttc_seconds": 0.96,
+      "is_approaching": true,
+      "event_level": 2,
+      "label": "Near Miss - TTC < 1s",
+      "notes": "TTC 0.96s indicates collision risk, should be Level 2"
+    },
+    {
+      "frame": 91,
+      "time_seconds": 3.03,
+      "track_ids": [11, 10],
+      "object_types": ["car", "car"],
+      "distance_meters": 0.533,
+      "ttc_seconds": 1.05,
+      "is_approaching": true,
+      "event_level": 2,
+      "label": "Near Miss - Critical Distance",
+      "notes": "Distance 0.533m, very close, high collision risk"
+    },
+    {
+      "frame": 97,
+      "time_seconds": 3.23,
+      "track_ids": [11, 10],
+      "object_types": ["car", "car"],
+      "distance_meters": 0.338,
+      "ttc_seconds": 0.27,
+      "is_approaching": true,
+      "event_level": 1,
+      "label": "Collision Risk - Extreme",
+      "notes": "TTC 0.27s, distance 0.338m - most critical event"
+    }
+  ],
+  
+  "false_positives": [
+    {
+      "frame": 67,
+      "track_ids": [9, 10],
+      "reason": "Separating, PET > collision point",
+      "ttc": "separating"
+    },
+    {
+      "frame": 70,
+      "track_ids": [7, 9],
+      "reason": "Distance > 1.5m, too far",
+      "distance_meters": 1.67
+    },
+    {
+      "frame": 73,
+      "track_ids": [7, 9],
+      "reason": "Distance > 1.5m",
+      "distance_meters": 1.72
+    },
+    {
+      "frame": 76,
+      "track_ids": [7, 9],
+      "reason": "Distance > 1.5m",
+      "distance_meters": 1.92
+    },
+    {
+      "frame": 79,
+      "track_ids": [7, 9],
+      "reason": "Distance > 1.5m",
+      "distance_meters": 1.96
+    }
+  ],
+  
+  "summary": {
+    "total_ground_truth_events": 3,
+    "level_1_critical": 1,
+    "level_2_near_miss": 2,
+    "level_3_avoidance": 0,
+    "false_positives_count": 5,
+    "total_detections": 11,
+    "notes": "Level 3 (>1.5m) events should not be classified as collision risk - these are false positives"
+  },
+  
+  "accuracy_expectations": {
+    "precision_level_1": "100% (1/1)",
+    "precision_level_2": "100% (2/2)",
+    "precision_level_3": "0% (5 false positives with no real Level 3 events)",
+    "overall_precision": "37.5% (3/8 real collision events out of 11 detections)",
+    "overall_recall": "100% (3/3 real events detected)",
+    "f1_score": "54.5%"
+  }
+}

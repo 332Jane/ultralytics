@@ -1,8 +1,9 @@
 # 碰撞检测管道 - 示例配置文件
 # 文件名: homograph_fullscreen_example.yaml
+# 运行命令: cd /workspace/ultralytics && python examples/trajectory_demo/collision_detection_pipeline_yolo_first_method_a.py --config examples/trajectory_demo/configs/homograph_fullscreen_example.yaml
 
 video:
-  path: "videos/Homograph_Teset_FullScreen.mp4"
+  path: "/workspace/ultralytics/videos/Homograph_Teset_FullScreen.mp4"
   description: "Homograph全屏测试视频"
   fps: 30
 
@@ -15,7 +16,7 @@ homography:
   enabled: true
   
   # 使用预先计算的homography矩阵文件
-  matrix_file: "calibration/Homograph_Teset_FullScreen_homography.json"
+  matrix_file: "/workspace/ultralytics/calibration/Homograph_Teset_FullScreen_homography.json"
   
   # 如果想从标注点计算，注释掉matrix_file并取消注释下面的calibration_points
   # calibration_points:

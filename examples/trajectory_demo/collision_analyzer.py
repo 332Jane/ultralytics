@@ -267,13 +267,14 @@ class CollisionAnalyzer:
         # Check if approaching
         approaching = approach_speed < -0.01  # Moving toward each other
         
-        if not approaching:
-            return None, False
+        # Calculate TTC regardless of approaching direction
+        # This captures cases where objects are separating but still have collision risk
+        # if they were very close when separation started
+        if abs(approach_speed) > 0.01:  # Only if there's relative motion
+            ttc = min_dist / abs(approach_speed)
+            return ttc if ttc > 0 else None, approaching
         
-        # Calculate TTC
-        ttc = min_dist / abs(approach_speed)
-        
-        return ttc if ttc > 0 else None, True
+        return None, approaching
     
     @staticmethod
     def _assess_risk(min_dist: float,
@@ -283,6 +284,10 @@ class CollisionAnalyzer:
         """
         Assess collision risk level.
         
+        Now evaluates both approaching and separating objects.
+        For separating objects, only assess if they have valid TTC
+        (meaning they had recent collision risk).
+        
         Risk levels:
         - CRITICAL: High risk, immediate action needed
         - HIGH: Elevated risk, caution required
@@ -291,7 +296,7 @@ class CollisionAnalyzer:
         
         Args:
             min_dist: Minimum distance in meters
-            ttc: Time to collision in seconds (None if not approaching)
+            ttc: Time to collision in seconds (now computed for separating too)
             relative_heading: Relative heading angle in radians
             approaching: Whether objects are approaching
         
@@ -299,21 +304,28 @@ class CollisionAnalyzer:
             Risk level string: 'CRITICAL', 'HIGH', 'MEDIUM', 'LOW'
         """
         
-        if not approaching:
-            # Not approaching, low risk
+        # Separating objects with no valid TTC = low risk
+        if not approaching and (ttc is None or ttc <= 0):
             if min_dist < 0.5:
-                return 'MEDIUM'  # Close but separating
+                return 'MEDIUM'  # Too close, even if separating
             return 'LOW'
         
-        # Objects are approaching
-        if min_dist < 0.5 or (ttc is not None and ttc < 1.0):
+        # Approaching or separating with valid TTC
+        if ttc is not None and ttc > 0:
+            if ttc < 1.0 or min_dist < 0.5:
+                return 'CRITICAL'
+            elif ttc < 2.0 or min_dist < 1.5:
+                return 'HIGH'
+            elif ttc < 5.0 or min_dist < 3.0:
+                return 'MEDIUM'
+        elif min_dist < 0.5:
             return 'CRITICAL'
-        elif min_dist < 1.5 or (ttc is not None and ttc < 2.0):
+        elif min_dist < 1.5:
             return 'HIGH'
-        elif min_dist < 3.0 or (ttc is not None and ttc < 5.0):
+        elif min_dist < 3.0:
             return 'MEDIUM'
-        else:
-            return 'LOW'
+        
+        return 'LOW'
     
     @staticmethod
     def _calculate_pet(obj1_track: List[dict],

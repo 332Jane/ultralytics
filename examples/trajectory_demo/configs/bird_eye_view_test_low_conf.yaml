@@ -1,0 +1,40 @@
+video:
+  path: /workspace/ultralytics/videos/BirdEyeViewTest.mp4
+  description: Bird Eye View Test - 低置信度版本
+  fps: 30
+
+yolo:
+  model: yolo11m
+  confidence_threshold: 0.3  # 降低到0.3试试
+  skip_frames: 3
+
+homography:
+  enabled: true
+  calibration_points:
+    - name: "LeftBottom"
+      pixel_coordinates: [179, 1069]
+      world_coordinates: [0, 0]
+    - name: "RightBottom"
+      pixel_coordinates: [608, 1071]
+      world_coordinates: [20, 0]
+    - name: "LeftTop"
+      pixel_coordinates: [203, 62]
+      world_coordinates: [0, 33.33]
+    - name: "RightTop"
+      pixel_coordinates: [604, 68]
+      world_coordinates: [20, 33.33]
+
+collision:
+  proximity_threshold_m: 4.5
+  anchor_distance_threshold_m: 1.0
+  vertex_shrink: 0.75
+
+output:
+  output_dir: null
+
+report:
+  max_events_in_report: 10
+  include_filtered_events: true
+
+advanced:
+  min_track_length: 3

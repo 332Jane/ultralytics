@@ -1,0 +1,366 @@
+======================================================================
+YOLO-First 碰撞检测分析报告
+生成时间: 2026-01-19 22:08:38
+输入视频: videos/Homograph_Teset_FullScreen.mp4
+Homography: calibration/Homograph_Teset_FullScreen_homography.json
+结果目录: /workspace/ultralytics/results_fixed_threshold/Homograph_Teset_FullScreen_20260119_220114_yolo_first_method_a
+
+处理方式: YOLO-First
+流程: YOLO检测 → 轨迹(px) → 关键帧 → Homography(关键帧) → 分析
+
+关键帧统计:
+
+总接近事件: 36
+Level 1 (Collision): 0
+Level 2 (Near Miss): 2
+Level 3 (Avoidance): 34
+
+根据TTC值的碰撞风险分类:
+
+【Rear-end - Serious Conflict (TTC 0-2.8s)】: 11 个
+  Frame 7: TTC=1.53s, 距离=1.472m
+  Frame 76: TTC=0.43s, 距离=0.374m
+  Frame 82: TTC=0.35s, 距离=0.329m
+  Frame 85: TTC=2.13s, 距离=1.465m
+  Frame 88: TTC=0.32s, 距离=0.984m
+  ... 还有 6 个
+
+【Sideswipe - Serious Conflict (TTC 0-2.3s)】: 3 个
+  Frame 103: TTC=0.17s, 距离=0.533m
+  Frame 112: TTC=0.14s, 距离=0.479m
+  Frame 115: TTC=0.0749s, 距离=0.231m
+
+
+前10个高风险事件（详细信息）:
+
+Frame 97 (3.23s)
+物体ID: [11, 10]
+风险等级: Level 2 (Near Miss)
+距离(像素): 208.8px
+距离(米): 1.11m
+TTC (时间碰撞): 0.0440s
+碰撞部位: head ↔ front_center
+最小距离: 0.338m
+
+Frame 100 (3.33s)
+物体ID: [11, 10]
+风险等级: Level 2 (Near Miss)
+距离(像素): 191.6px
+距离(米): 1.13m
+TTC (时间碰撞): 0.0577s
+碰撞部位: head ↔ front_center
+最小距离: 0.456m
+
+Frame 1 (0.03s)
+物体ID: [1, 5]
+风险等级: Level 3 (Avoidance)
+距离(像素): 376.8px
+距离(米): 3.30m
+TTC (时间碰撞): 远离 / Separating
+碰撞部位: rear_left ↔ front_center
+最小距离: 1.453m
+
+Frame 4 (0.13s)
+物体ID: [1, 5]
+风险等级: Level 3 (Avoidance)
+距离(像素): 356.1px
+距离(米): 3.25m
+TTC (时间碰撞): 71.60s
+碰撞部位: rear_left ↔ front_center
+最小距离: 1.460m
+
+Frame 7 (0.23s)
+物体ID: [1, 5]
+风险等级: Level 3 (Avoidance)
+距离(像素): 328.5px
+距离(米): 3.12m
+TTC (时间碰撞): 1.53s
+碰撞部位: rear_center ↔ front_right
+最小距离: 1.472m
+
+Frame 67 (2.23s)
+物体ID: [7, 9]
+风险等级: Level 3 (Avoidance)
+距离(像素): 323.6px
+距离(米): 1.64m
+TTC (时间碰撞): 0.38s
+碰撞部位: front_right ↔ rear_right
+最小距离: 0.564m
+
+Frame 67 (2.23s)
+物体ID: [9, 10]
+风险等级: Level 3 (Avoidance)
+距离(像素): 324.6px
+距离(米): 1.63m
+TTC (时间碰撞): 远离 / Separating
+PET (近距离通过时间): 0.5000s
+碰撞部位: rear_right ↔ front_right
+最小距离: 0.580m
+
+Frame 70 (2.33s)
+物体ID: [7, 9]
+风险等级: Level 3 (Avoidance)
+距离(像素): 315.9px
+距离(米): 1.67m
+TTC (时间碰撞): 1.40s
+碰撞部位: front_right ↔ rear_right
+最小距离: 0.556m
+
+Frame 73 (2.43s)
+物体ID: [7, 9]
+风险等级: Level 3 (Avoidance)
+距离(像素): 304.9px
+距离(米): 1.72m
+TTC (时间碰撞): 0.32s
+碰撞部位: front_right ↔ rear_right
+最小距离: 0.668m
+
+Frame 76 (2.53s)
+物体ID: [7, 9]
+风险等级: Level 3 (Avoidance)
+距离(像素): 326.8px
+距离(米): 1.92m
+TTC (时间碰撞): 0.43s
+碰撞部位: front_left ↔ rear_center
+最小距离: 0.374m
+
+======================================================================
+
+被过滤事件 (物体平行/远离/TTC过长): 22 个
+（这些事件未纳入高风险列表，原因如下）
+
+Frame 1 (0.03s)
+  物体ID: [1, 5]
+  过滤原因: 物体远离（距离增加）
+  距离: 1.453m | 接近: 否 | 
+
+Frame 4 (0.13s)
+  物体ID: [1, 5]
+  过滤原因: 追尾但TTC过长(71.60s > 4.7s)
+  距离: 1.460m | 接近: 是 | TTC: 71.60s
+
+Frame 67 (2.23s)
+  物体ID: [7, 9]
+  过滤原因: 物体远离（距离增加）
+  距离: 0.564m | 接近: 否 | TTC: 0.38s
+
+Frame 67 (2.23s)
+  物体ID: [9, 10]
+  过滤原因: 物体远离（距离增加）
+  距离: 0.580m | 接近: 否 | 
+
+Frame 70 (2.33s)
+  物体ID: [7, 9]
+  过滤原因: 物体远离（距离增加）
+  距离: 0.556m | 接近: 否 | TTC: 1.40s
+
+Frame 73 (2.43s)
+  物体ID: [7, 9]
+  过滤原因: 物体远离（距离增加）
+  距离: 0.668m | 接近: 否 | TTC: 0.32s
+
+Frame 79 (2.63s)
+  物体ID: [7, 9]
+  过滤原因: 物体远离（距离增加）
+  距离: 0.345m | 接近: 否 | TTC: 0.84s
+
+Frame 79 (2.63s)
+  物体ID: [9, 11]
+  过滤原因: 物体远离（距离增加）
+  距离: 1.153m | 接近: 否 | TTC: 0.31s
+
+Frame 85 (2.83s)
+  物体ID: [7, 9]
+  过滤原因: 物体远离（距离增加）
+  距离: 0.310m | 接近: 否 | TTC: 0.32s
+
+Frame 85 (2.83s)
+  物体ID: [9, 14]
+  过滤原因: 物体远离（距离增加）
+  距离: 0.375m | 接近: 否 | TTC: 0.0603s
+
+Frame 88 (2.93s)
+  物体ID: [7, 9]
+  过滤原因: 物体远离（距离增加）
+  距离: 0.769m | 接近: 否 | TTC: 1.07s
+
+Frame 88 (2.93s)
+  物体ID: [9, 14]
+  过滤原因: 物体远离（距离增加）
+  距离: 0.873m | 接近: 否 | TTC: 0.64s
+
+Frame 94 (3.13s)
+  物体ID: [11, 10]
+  过滤原因: 物体远离（距离增加）
+  距离: 0.104m | 接近: 否 | TTC: 0.0167s
+
+Frame 100 (3.33s)
+  物体ID: [11, 10]
+  过滤原因: 物体远离（距离增加）
+  距离: 0.456m | 接近: 否 | TTC: 0.0577s
+
+Frame 103 (3.43s)
+  物体ID: [11, 10]
+  过滤原因: 物体远离（距离增加）
+  距离: 0.293m | 接近: 否 | TTC: 0.0664s
+
+Frame 106 (3.53s)
+  物体ID: [7, 10]
+  过滤原因: 物体远离（距离增加）
+  距离: 0.470m | 接近: 否 | TTC: 0.54s
+
+Frame 106 (3.53s)
+  物体ID: [11, 10]
+  过滤原因: 物体远离（距离增加）
+  距离: 0.995m | 接近: 否 | TTC: 0.15s
+
+Frame 106 (3.53s)
+  物体ID: [10, 14]
+  过滤原因: 物体远离（距离增加）
+  距离: 0.464m | 接近: 否 | TTC: 0.43s
+
+Frame 109 (3.63s)
+  物体ID: [11, 10]
+  过滤原因: 物体远离（距离增加）
+  距离: 1.490m | 接近: 否 | TTC: 0.32s
+
+Frame 109 (3.63s)
+  物体ID: [10, 14]
+  过滤原因: 物体远离（距离增加）
+  距离: 0.702m | 接近: 否 | TTC: 0.91s
+
+  ... 还有 2 个被过滤事件
+
+
+======================================================================
+
+TTC (时间碰撞) 分级标准参考:
+
+┌─────────────────┬──────────────────┬──────────────────┐
+│ 碰撞类型         │ 严重程度         │ TTC阈值 (秒)     │
+├─────────────────┼──────────────────┼──────────────────┤
+│ Rear-end        │ Serious conflict │ 0 – 2.8 s        │
+│ (追尾)          │ General conflict │ 2.8 – 4.7 s      │
+├─────────────────┼──────────────────┼──────────────────┤
+│ Sideswipe       │ Serious conflict │ 0 – 2.3 s        │
+│ (侧面碰撞)      │ General conflict │ 2.3 – 4.2 s      │
+└─────────────────┴──────────────────┴──────────────────┘
+
+过滤策略:
+  1. 物体远离（距离增加）: 不计入高风险事件
+  2. 物体速度平行或同速: 无有效TTC，不计入高风险事件
+  3. TTC过长（Rear-end>4.7s / Sideswipe>4.2s）: 风险较低，不计入高风险事件
+  4. 高风险事件: 仅包括TTC在分级标准范围内且物体真正接近的事件
+
+
+======================================================================
+综合TTC+PET分析报告（与Ground Truth对比）
+
+1. 所有检测事件的TTC/PET分析:
+
+  • 具有有效TTC值的事件: 34/36
+  • 具有PET值的事件: 14/36
+
+  TTC值详情:
+    Frame    4: TTC=    71.60s [  ]
+    Frame    7: TTC=     1.53s [  ]
+    Frame   67: TTC=     0.38s [✓ GT]
+    Frame   70: TTC=     1.40s [  ]
+    Frame   73: TTC=     0.32s [  ]
+    Frame   76: TTC=     0.43s [  ]
+    Frame   79: TTC=     0.31s [  ]
+    Frame   79: TTC=     0.84s [  ]
+    Frame   82: TTC=     0.35s [  ]
+    Frame   85: TTC=   0.0603s [  ]
+    Frame   85: TTC=     0.32s [  ]
+    Frame   85: TTC=     2.13s [  ]
+    Frame   88: TTC=     0.32s [  ]
+    Frame   88: TTC=     0.64s [  ]
+    Frame   88: TTC=     1.07s [  ]
+    Frame   91: TTC=     0.19s [✓ GT]
+    Frame   94: TTC=   0.0167s [  ]
+    Frame   94: TTC=     0.54s [  ]
+    Frame   97: TTC=   0.0440s [✓ GT]
+    Frame   97: TTC=     0.26s [✓ GT]
+    Frame  100: TTC=   0.0577s [  ]
+    Frame  100: TTC=     0.38s [  ]
+    Frame  103: TTC=   0.0664s [  ]
+    Frame  103: TTC=     0.17s [  ]
+    Frame  103: TTC=     0.17s [  ]
+    Frame  106: TTC=     0.15s [  ]
+    Frame  106: TTC=     0.43s [  ]
+    Frame  106: TTC=     0.54s [  ]
+    Frame  109: TTC=     0.32s [  ]
+    Frame  109: TTC=     0.91s [  ]
+    Frame  112: TTC=     0.14s [  ]
+    Frame  115: TTC=   0.0749s [  ]
+    Frame  118: TTC=   0.0376s [  ]
+    Frame  124: TTC=     0.42s [  ]
+
+  PET值详情:
+    Frame   67: PET=0.5000s [✓ GT]
+    Frame   79: PET=0.2000s [  ]
+    Frame   94: PET=0.3000s [  ]
+    Frame   97: PET=0.3000s [✓ GT]
+    Frame  100: PET=0.3000s [  ]
+    Frame  103: PET=0.3000s [  ]
+    Frame  103: PET=0.8000s [  ]
+    Frame  106: PET=0.3000s [  ]
+    Frame  106: PET=0.8000s [  ]
+    Frame  109: PET=0.8000s [  ]
+    Frame  112: PET=0.8000s [  ]
+    Frame  115: PET=0.8000s [  ]
+    Frame  118: PET=0.8000s [  ]
+    Frame  124: PET=0.8000s [  ]
+
+
+2. 与Ground Truth对比:
+
+  Ground Truth标注事件数: 3
+  系统检测事件数: 36
+  重叠事件(TP): 5
+
+
+3. TTC过滤影响分析:
+
+  仅保留有TTC值的事件:
+    • 保留事件数: 21
+    • TP (真正碰撞): 3
+    • FP (假阳性): 18
+    • Precision: 14.29%
+
+
+4. PET过滤影响分析:
+
+  仅保留有PET值的事件:
+    • 保留事件数: 12
+    • TP (真正碰撞): 2
+    • FP (假阳性): 10
+    • Precision: 16.67%
+
+
+5. 精度对比总结:
+
+  基线 (所有事件):
+    • 事件数: 22
+    • Precision: 13.64%
+
+  TTC过滤后:
+    • 事件数: 21
+    • Precision: 14.29%
+    • 改进: +0.65%
+
+  PET过滤后:
+    • 事件数: 12
+    • Precision: 16.67%
+    • 改进: +3.03%
+
+  💡 关键洞察:
+     • TTC表示物体接近时的时间余量（时间碰撞指标）
+     • PET表示通过时间差异（轨迹重叠指标）
+     • 两者都存在的事件为最高风险真实碰撞
+     • 仅PET存在表示真正发生了近距离通过
+     • 仅TTC存在表示物体接近但未发生轨迹重叠
+
+======================================================================
+报告结束

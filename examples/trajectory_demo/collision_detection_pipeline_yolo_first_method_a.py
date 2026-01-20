@@ -1,7 +1,7 @@
 """
 collision_detection_pipeline_yolo_first_method_a.py
 
-YOLO-First 碰撞检测管道 (Method A )
+YOLO-First 碰撞检测管道
 执行顺序: YOLO检测 → 轨迹构建(px) → 关键帧检测 → Homography变换(仅关键帧) → TTC分析
 
 
@@ -54,7 +54,7 @@ from collision_analyzer import CollisionAnalyzer
 
 
 class YOLOFirstPipelineA:
-    def __init__(self, video_path, homography_path=None, output_base=None, skip_frames=3, model='yolo11n', min_track_length=3):
+    def __init__(self, video_path, homography_path=None, output_base=None, skip_frames=3, model='yolo11n', min_track_length=3, vertex_shrink=0.75):
         """初始化 YOLO-First pipeline 
         
         Args:
@@ -64,6 +64,7 @@ class YOLOFirstPipelineA:
             skip_frames: 抽帧参数，每隔 skip_frames 帧处理一帧 (最小值=3，用于性能优化和速度准确性)
             model: YOLO 模型选择 (yolo11n/yolo11m/yolo11l)
             min_track_length: 最小轨迹长度，短于此的被认为是误检
+            vertex_shrink: BBox顶点向中心缩小的比例 (0-1，默认0.75)
         """
         self.video_path = video_path
         self.homography_path = homography_path
@@ -71,6 +72,7 @@ class YOLOFirstPipelineA:
         self.skip_frames = max(3, skip_frames)  # 强制至少跳帧3
         self.model = model  # YOLO 模型
         self.min_track_length = min_track_length  # 最小轨迹长度
+        self.vertex_shrink = vertex_shrink  # BBox顶点缩小比例
         # 使用 /workspace/ultralytics/results 作为输出目录（确保路径正确）
         if output_base is None:
             output_base = "/workspace/ultralytics/results"
@@ -86,7 +88,7 @@ class YOLOFirstPipelineA:
         video_filename = Path(video_path).stem  # 获取视频文件名（不含扩展名）
         self.run_dir = (self.output_base / f"{video_filename}_{timestamp}_yolo_first_method_a").resolve()
         
-        # 创建子目录结构 (Method A)
+        # 创建子目录结构
         self.detection_dir = self.run_dir / "1_yolo_detection"
         self.trajectory_dir = self.run_dir / "2_trajectories"
         self.keyframe_dir = self.run_dir / "3_key_frames"
@@ -98,7 +100,7 @@ class YOLOFirstPipelineA:
             d.mkdir(parents=True, exist_ok=True)
         
         print(f"\n{'='*70}")
-        print(f"YOLO-First 碰撞检测Pipeline (Method A - 导师推荐)")
+        print(f"YOLO-First 碰撞检测Pipeline")
         print(f"{'='*70}")
         print(f"时间戳: {timestamp}")
         print(f"结果目录: {self.run_dir}")
@@ -1096,20 +1098,21 @@ class YOLOFirstPipelineA:
     # STEP 3: 关键帧检测 (接近事件)
     # =========================================================================
 
-    def extract_key_frames(self, all_detections, tracks, world_distance_threshold=2.0, debug_threshold=5.0):
+    def extract_key_frames(self, all_detections, tracks, world_distance_threshold=3.0, debug_threshold=5.0):
         """Step 3: 关键帧检测 (接近事件) - 基于Homography世界坐标
         
         流程说明:
         1. Step 2已在轨迹中使用Homography转换得到世界坐标 (center_x_world, center_y_world)
         2. Step 3使用这些世界坐标计算物体间距离，检测接近事件
-        3. 通过空间验证过滤：确保物体在Homography标定区域内 (X[-1.75,1.75]m, Y[0,25]m)
-           - 若物体世界坐标超出范围，说明Homography变换可能不可靠，应过滤
+        3. Y轴范围验证：确保物体在合理的纵向范围内 (Y[0,25]m)
+           - 检查Y轴范围以确保物体在主要交通区域
+           - X轴不做限制，允许检测各个横向位置的事件
         4. 保存通过阈值的接近事件作为关键帧
         
         参数:
         - all_detections: 原始检测结果 (用于保存关键帧图像)
         - tracks: Step 2返回的轨迹信息 (已包含Homography变换的world坐标)
-        - world_distance_threshold: 关键帧检测阈值（默认 4.5 米）
+        - world_distance_threshold: 关键帧检测阈值（默认 3.0 米）
         """
         print(f"\n【Step 3: 关键帧检测 (基于Homography世界坐标)】")
         print(f"  ℹ️  使用Step 2中Homography变换的世界坐标进行距离计算和空间验证")
@@ -1161,20 +1164,17 @@ class YOLOFirstPipelineA:
                     x2_world = track2['center_x_world']
                     y2_world = track2['center_y_world']
                     
-                    # ✨ 新增: 验证两个对象都在标定区域内
-                    # 标定区域范围: X [-1.75, 1.75] m, Y [0, 25] m
-                    world_x_min, world_x_max = -1.75, 1.75
+                    # ✨ Y轴范围验证：确保物体在主要交通区域 (Y[0,25]m)
+                    # X轴不做限制，允许检测各个横向位置的事件
                     world_y_min, world_y_max = 0.0, 25.0
-                    world_margin = 0.3  # 允许轻微超出范围
+                    world_margin = 0.5  # 允许轻微超出范围
                     
-                    # 检查两个物体是否都在有效范围内
-                    obj1_valid = (world_x_min - world_margin <= x1_world <= world_x_max + world_margin and
-                                  world_y_min - world_margin <= y1_world <= world_y_max + world_margin)
-                    obj2_valid = (world_x_min - world_margin <= x2_world <= world_x_max + world_margin and
-                                  world_y_min - world_margin <= y2_world <= world_y_max + world_margin)
+                    # 检查两个物体的Y坐标是否都在有效范围内
+                    obj1_valid_y = (world_y_min - world_margin <= y1_world <= world_y_max + world_margin)
+                    obj2_valid_y = (world_y_min - world_margin <= y2_world <= world_y_max + world_margin)
                     
-                    if not (obj1_valid and obj2_valid):
-                        # 跳过超出标定区域的对象对
+                    if not (obj1_valid_y and obj2_valid_y):
+                        # 跳过Y坐标超出范围的对象对
                         continue
                     
                     # 获取像素坐标用于图像保存
@@ -1348,8 +1348,8 @@ class YOLOFirstPipelineA:
         Returns:
             dict: {anchor_name: (x, y), ...}
         """
-        # 缩小bounding box到原来的80%，确保锚点在物体内
-        bbox_xywh = self._shrink_bbox(bbox_xywh, shrink_ratio=0.8)
+        # 缩小bounding box到原来的vertex_shrink比例，确保锚点在物体内
+        bbox_xywh = self._shrink_bbox(bbox_xywh, shrink_ratio=self.vertex_shrink)
         
         try:
             if class_id == 0:  # person
@@ -1943,6 +1943,17 @@ class YOLOFirstPipelineA:
                     f.write(f"  ... 还有 {len(ttc_classified['sideswipe_general']) - 5} 个\n")
                 f.write("\n")
             
+            # PET近距离通过事件（Part 2: 没有撞车风险但危险）
+            if ttc_classified['near_miss_pet']:
+                f.write(f"【Near Miss - Post-Encroachment Time (PET < 1.0s)】: {len(ttc_classified['near_miss_pet'])} 个\n")
+                f.write("（物体已分离，但曾在危险距离内通过，PET值表示逃脱碰撞的时间裕度）\n")
+                for event in ttc_classified['near_miss_pet'][:5]:
+                    pet = event['multi_anchor_detailed'].get('pet_seconds', 0)
+                    f.write(f"  Frame {event['frame']}: PET={pet:.4f}s, 距离={event['multi_anchor_detailed'].get('min_distance_meters', 0):.3f}m\n")
+                if len(ttc_classified['near_miss_pet']) > 5:
+                    f.write(f"  ... 还有 {len(ttc_classified['near_miss_pet']) - 5} 个\n")
+                f.write("\n")
+            
             if not any([ttc_classified['rear_end_serious'], ttc_classified['rear_end_general'],
                        ttc_classified['sideswipe_serious'], ttc_classified['sideswipe_general']]):
                 f.write("未检测到具有有效TTC值的碰撞事件\n\n")
@@ -2172,13 +2183,21 @@ class YOLOFirstPipelineA:
         return "其他"
     
     def _classify_events_by_ttc(self, analyzed_events):
-        """根据TTC值和相对方向判断碰撞类型和严重程度"""
+        """根据TTC值和相对方向判断碰撞类型和严重程度
+        
+        改进逻辑：
+        1. 所有事件都计算TTC（不管approaching）
+        2. TTC < 2.0s的事件算高风险，即使远离
+        3. TTC >= 2.0s或无法计算的事件检查PET
+        4. 分两部分报告：TTC高风险 + PET near miss
+        """
         classified = {
-            'rear_end_serious': [],      # TTC 0-2.8s
-            'rear_end_general': [],      # TTC 2.8-4.7s
-            'sideswipe_serious': [],     # TTC 0-2.3s
-            'sideswipe_general': [],     # TTC 2.3-4.2s
-            'filtered': []               # 被过滤的事件（平行、远离等）
+            'rear_end_serious': [],      # TTC 0-2.8s (高风险)
+            'rear_end_general': [],      # TTC 2.8-4.7s (中等)
+            'sideswipe_serious': [],     # TTC 0-2.3s (高风险)
+            'sideswipe_general': [],     # TTC 2.3-4.2s (中等)
+            'near_miss_pet': [],         # PET < 1.0s (近距离通过)
+            'filtered': []               # 被过滤的事件（无碰撞风险）
         }
         
         for event in analyzed_events:
@@ -2189,36 +2208,42 @@ class YOLOFirstPipelineA:
             heading_analysis = event['multi_anchor_detailed'].get('heading_analysis', {})
             approaching = heading_analysis.get('approaching', False)
             ttc = event['multi_anchor_detailed'].get('ttc_seconds')
+            distance = event['multi_anchor_detailed'].get('min_distance_meters', float('inf'))
             
-            # 判断是否真正接近且有有效TTC
-            if not approaching or ttc is None or ttc <= 0:
-                classified['filtered'].append(event)
-                continue
-            
-            # 根据相对heading判断是rear-end还是sideswipe
-            relative_heading = heading_analysis.get('relative_heading_rad', 0)
-            
-            # 将heading标准化到[-π, π]
-            import math
-            heading_abs = abs(relative_heading)
-            is_sideswipe = heading_abs > math.pi / 4  # 大于45度则判定为侧向
-            
-            if is_sideswipe:
-                # Sideswipe 碰撞
-                if ttc < 2.3:
-                    classified['sideswipe_serious'].append(event)
-                elif ttc < 4.2:
-                    classified['sideswipe_general'].append(event)
+            # 关键改进：即使远离，如果TTC < 2.0s，仍算高风险
+            if ttc is not None and ttc > 0 and ttc < 2.0:
+                # 高风险事件（即使远离）
+                relative_heading = heading_analysis.get('relative_heading_rad', 0)
+                
+                import math
+                heading_abs = abs(relative_heading)
+                is_sideswipe = heading_abs > math.pi / 4  # 大于45度则判定为侧向
+                
+                if is_sideswipe:
+                    if ttc < 2.3:
+                        classified['sideswipe_serious'].append(event)
+                    else:
+                        classified['sideswipe_general'].append(event)
                 else:
+                    if ttc < 2.8:
+                        classified['rear_end_serious'].append(event)
+                    else:
+                        classified['rear_end_general'].append(event)
+            
+            # TTC >= 2.0s或无法计算 → 检查PET
+            elif ttc is None or ttc >= 2.0:
+                # 检查PET指标
+                pet = event['multi_anchor_detailed'].get('pet_seconds')
+                if pet is not None and pet > 0 and pet < 1.0 and distance < 1.5:
+                    # 近距离通过 (near miss)
+                    classified['near_miss_pet'].append(event)
+                else:
+                    # 没有碰撞风险
                     classified['filtered'].append(event)
+            
             else:
-                # Rear-end 碰撞
-                if ttc < 2.8:
-                    classified['rear_end_serious'].append(event)
-                elif ttc < 4.7:
-                    classified['rear_end_general'].append(event)
-                else:
-                    classified['filtered'].append(event)
+                # ttc <= 0的无效情况
+                classified['filtered'].append(event)
         
         return classified
     
@@ -2243,7 +2268,7 @@ class YOLOFirstPipelineA:
     # =========================================================================
     
     def run(self, conf_threshold=0.45):
-        """运行完整 YOLO-First 管道 (Method A)"""
+        """运行完整 YOLO-First 管道"""
         try:
             # Step 0: 加载Homography (如果提供)
             if self.homography_path:
@@ -2296,7 +2321,7 @@ class YOLOFirstPipelineA:
             tracks = self.build_trajectories(all_detections)
             
             # Step 3: 关键帧检测 (Option B: 使用Step 2保存的轨迹world坐标)
-            proximity_events = self.extract_key_frames(all_detections, tracks, world_distance_threshold=4.5)
+            proximity_events = self.extract_key_frames(all_detections, tracks, world_distance_threshold=3.0)
             
             if not proximity_events:
                 print(f"\n⚠️  未检测到接近事件")
@@ -2348,7 +2373,7 @@ class YOLOFirstPipelineA:
             self.generate_report(proximity_events, analyzed_events, level_counts)
             
             print(f"\n{'='*70}")
-            print(f"✓ YOLO-First Pipeline (Method A) 完成！")
+            print(f"✓ YOLO-First Pipeline 完成！")
             print(f"{'='*70}")
             print(f"结果保存在: {self.run_dir}")
             
@@ -2381,26 +2406,71 @@ class YOLOFirstPipelineA:
 
 if __name__ == '__main__':
     import argparse
+    import yaml
+    from pathlib import Path
     
-    parser = argparse.ArgumentParser(description='YOLO-First 碰撞检测Pipeline (Method A - 导师推荐)')
-    parser.add_argument('--video', type=str, required=True, help='输入视频路径')
+    parser = argparse.ArgumentParser(description='YOLO-First 碰撞检测Pipeline')
+    parser.add_argument('--config', type=str, default=None, 
+                       help='YAML配置文件路径 (推荐方式)')
+    parser.add_argument('--video', type=str, default=None, 
+                       help='输入视频路径 (命令行方式，与--config互斥)')
     parser.add_argument('--homography', type=str, default=None, 
                        help='Homography JSON路径 (可选)')
     parser.add_argument('--output', type=str, default='../../results', 
                        help='结果基础目录')
-    parser.add_argument('--conf', type=float, default=0.45, 
-                       help='YOLO置信度阈值 (越高=越严格，减少误检) (默认: 0.45)')
-    parser.add_argument('--skip-frames', type=int, default=3,
-                       help='抽帧参数: 3=每隔3帧处理1帧, 5=每隔5帧处理1帧 (最小值为3，用于提高速度计算准确性) (默认: 3)')
-    parser.add_argument('--model', type=str, default='yolo11m',
-                       help='YOLO 模型: yolo11n(快速), yolo11m(中等,更精确), yolo11l(最精确) (默认: yolo11m)')
-    parser.add_argument('--min-track-length', type=int, default=3,
-                       help='最小轨迹长度(帧数)，短于此的轨迹被认为是误检并排除 (默认: 3)')
+    parser.add_argument('--conf', type=float, default=None, 
+                       help='YOLO置信度阈值 (默认: 0.45)')
+    parser.add_argument('--skip-frames', type=int, default=None,
+                       help='抽帧参数 (默认: 3)')
+    parser.add_argument('--model', type=str, default=None,
+                       help='YOLO 模型 (默认: yolo11m)')
     
     args = parser.parse_args()
     
-    pipeline = YOLOFirstPipelineA(args.video, args.homography, args.output, 
-                                  skip_frames=args.skip_frames, 
-                                  model=args.model,
-                                  min_track_length=args.min_track_length)
-    pipeline.run(args.conf)
+    # 优先使用YAML配置
+    if args.config:
+        print(f"\n【使用YAML配置】加载: {args.config}")
+        config_path = Path(args.config)
+        if not config_path.exists():
+            print(f"❌ 配置文件不存在: {args.config}")
+            exit(1)
+        
+        # 解析YAML
+        with open(args.config, 'r', encoding='utf-8') as f:
+            config = yaml.safe_load(f)
+        
+        video_path = config['video']['path']
+        homography_path = config.get('homography', {}).get('matrix_file', None) if config.get('homography', {}).get('enabled') else None
+        conf = config.get('yolo', {}).get('confidence_threshold', 0.45)
+        skip_frames = config.get('yolo', {}).get('skip_frames', 3)
+        model = config.get('yolo', {}).get('model', 'yolo11m')
+        output = config.get('output', {}).get('base_dir', '../../results')
+        vertex_shrink = config.get('collision', {}).get('vertex_shrink', 0.75)
+        
+        pipeline = YOLOFirstPipelineA(video_path, homography_path, output, 
+                                     skip_frames=skip_frames, 
+                                     model=model,
+                                     min_track_length=3,
+                                     vertex_shrink=vertex_shrink)
+        pipeline.run(conf)
+    
+    elif args.video:
+        print(f"\n【使用命令行参数】(不推荐，建议用--config)")
+        conf = args.conf if args.conf is not None else 0.45
+        skip_frames = args.skip_frames if args.skip_frames is not None else 3
+        model = args.model if args.model is not None else 'yolo11m'
+        
+        pipeline = YOLOFirstPipelineA(args.video, args.homography, args.output, 
+                                      skip_frames=skip_frames, 
+                                      model=model,
+                                      min_track_length=3)
+        pipeline.run(conf)
+    
+    else:
+        print("\n❌ 必须指定 --config 或 --video")
+        print("\n推荐用法：")
+        print(f"  python collision_detection_pipeline_yolo_first_method_a.py --config configs/homograph_fullscreen_example.yaml")
+        print("\n命令行用法（已弃用）：")
+        print(f"  python collision_detection_pipeline_yolo_first_method_a.py --video videos/xxx.mp4 --homography calibration/xxx.json")
+        parser.print_help()
+

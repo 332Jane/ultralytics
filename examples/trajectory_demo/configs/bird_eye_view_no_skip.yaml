@@ -1,0 +1,58 @@
+# Bird's Eye View Test - No Frame Skipping
+# 用于测试不跳帧处理的配置
+
+video:
+  path: /workspace/ultralytics/videos/BirdEyeViewTest.mp4
+  description: Bird Eye View Test Video - 鸟瞰视图测试视频，无跳帧
+  fps: 30
+
+yolo:
+  model: yolo11m
+  confidence_threshold: 0.45
+  skip_frames: 1  # 不跳帧：处理所有帧
+
+homography:
+  enabled: true
+  calibration_points:
+    - name: "左下"
+      pixel_coordinates: [179, 1069]
+      world_coordinates: [0, 0]
+    - name: "右下"
+      pixel_coordinates: [608, 1071]
+      world_coordinates: [20, 0]
+    - name: "左上"
+      pixel_coordinates: [203, 62]
+      world_coordinates: [0, 33.33]
+    - name: "右上"
+      pixel_coordinates: [604, 68]
+      world_coordinates: [20, 33.33]
+
+collision:
+  proximity_threshold_m: 4.5
+  anchor_distance_threshold_m: 1.0
+  vertex_shrink: 0.75
+
+ttc_pet:
+  ttc_thresholds:
+    rear_end_serious: 2.8
+    rear_end_general: 4.7
+    sideswipe_serious: 2.3
+    sideswipe_general: 4.2
+  safety_margin_m: 1.5
+
+output:
+  save_yolo_detection: true
+  save_keyframes: true
+  generate_pdf: true
+  save_json: true
+
+report:
+  max_events_in_report: 20
+  include_filtered_events: true
+  events_per_page_pdf: 3
+
+advanced:
+  min_track_length: 3
+  track_gap_threshold: 4
+  merge_same_frame_objects: true
+  merge_distance_threshold_px: 100

@@ -363,16 +363,16 @@ class CollisionDetectionPipeline:
             traceback.print_exc()
 
 
-if __name__ == '__main__':
-    import argparse
+# [DEPRECATED] if __name__ == '__main__':
+# [DEPRECATED]     import argparse
     
-    parser = argparse.ArgumentParser(description='碰撞检测完整Pipeline')
-    parser.add_argument('--video', type=str, required=True, help='输入视频路径')
-    parser.add_argument('--homography', type=str, required=True, help='Homography JSON路径')
-    parser.add_argument('--output', type=str, default='../../results', help='结果基础目录')
-    parser.add_argument('--conf', type=float, default=0.45, help='YOLO置信度阈值')
+# [DEPRECATED]     parser = argparse.ArgumentParser(description='碰撞检测完整Pipeline')
+# [DEPRECATED]     parser.add_argument('--video', type=str, required=True, help='输入视频路径')
+# [DEPRECATED]     parser.add_argument('--homography', type=str, required=True, help='Homography JSON路径')
+# [DEPRECATED]     parser.add_argument('--output', type=str, default='../../results', help='结果基础目录')
+# [DEPRECATED]     parser.add_argument('--conf', type=float, default=0.45, help='YOLO置信度阈值')
     
-    args = parser.parse_args()
+# [DEPRECATED]     args = parser.parse_args()
     
-    pipeline = CollisionDetectionPipeline(args.video, args.homography, args.output)
-    pipeline.run(args.conf)
+# [DEPRECATED]     pipeline = CollisionDetectionPipeline(args.video, args.homography, args.output)
+# [DEPRECATED]     pipeline.run(args.conf)

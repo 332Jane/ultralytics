@@ -500,19 +500,19 @@ class YOLOFirstPipelineC:
             traceback.print_exc()
 
 
-if __name__ == '__main__':
-    import argparse
+# [DEPRECATED] if __name__ == '__main__':
+# [DEPRECATED]     import argparse
     
-    parser = argparse.ArgumentParser(description='YOLO-First 碰撞检测Pipeline (方案C)')
-    parser.add_argument('--video', type=str, required=True, help='输入视频路径')
-    parser.add_argument('--homography', type=str, required=True, 
-                       help='Homography JSON路径 (必须)')
-    parser.add_argument('--output', type=str, default='../../results', 
-                       help='结果基础目录')
-    parser.add_argument('--conf', type=float, default=0.45, 
-                       help='YOLO置信度阈值')
+# [DEPRECATED]     parser = argparse.ArgumentParser(description='YOLO-First 碰撞检测Pipeline (方案C)')
+# [DEPRECATED]     parser.add_argument('--video', type=str, required=True, help='输入视频路径')
+# [DEPRECATED]     parser.add_argument('--homography', type=str, required=True, 
+# [DEPRECATED]                        help='Homography JSON路径 (必须)')
+# [DEPRECATED]     parser.add_argument('--output', type=str, default='../../results', 
+# [DEPRECATED]                        help='结果基础目录')
+# [DEPRECATED]     parser.add_argument('--conf', type=float, default=0.45, 
+# [DEPRECATED]                        help='YOLO置信度阈值')
     
-    args = parser.parse_args()
+# [DEPRECATED]     args = parser.parse_args()
     
-    pipeline = YOLOFirstPipelineC(args.video, args.homography, args.output)
-    pipeline.run(args.conf)
+# [DEPRECATED]     pipeline = YOLOFirstPipelineC(args.video, args.homography, args.output)
+# [DEPRECATED]     pipeline.run(args.conf)

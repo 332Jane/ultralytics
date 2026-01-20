@@ -1,0 +1,210 @@
+[
+  {
+    "frame": 97,
+    "time": 3.2333333333333334,
+    "track_id_1": 11,
+    "track_id_2": 10,
+    "class_1": "person",
+    "class_2": "truck",
+    "distance_pixel": 208.7699794147073,
+    "distance_meters": 1.113231851203636,
+    "object_classes": [
+      0,
+      7
+    ],
+    "center_1_px": [
+      483.85601806640625,
+      1425.0740966796875
+    ],
+    "center_2_px": [
+      536.8035278320312,
+      1223.1298828125
+    ],
+    "center_1_world": [
+      -0.33655664324760437,
+      0.4811157286167145
+    ],
+    "center_2_world": [
+      -0.018297141417860985,
+      1.5478847026824951
+    ],
+    "bbox_1": [
+      483.85601806640625,
+      1425.0740966796875,
+      146.963134765625,
+      274.733154296875
+    ],
+    "bbox_2": [
+      536.8035278320312,
+      1223.1298828125,
+      616.1812133789062,
+      347.3575439453125
+    ],
+    "positions": {
+      "obj1": {
+        "x": 483.85601806640625,
+        "y": 1425.0740966796875
+      },
+      "obj2": {
+        "x": 536.8035278320312,
+        "y": 1223.1298828125
+      }
+    },
+    "positions_world": {
+      "obj1": {
+        "x": -0.33655664324760437,
+        "y": 0.4811157286167145
+      },
+      "obj2": {
+        "x": -0.018297141417860985,
+        "y": 1.5478847026824951
+      }
+    },
+    "multi_anchor": {
+      "closest_parts": [
+        "center",
+        "center"
+      ],
+      "risk_level": "UNKNOWN",
+      "ttc": null
+    },
+    "multi_anchor_detailed": {
+      "min_distance_meters": 0.3381958305835724,
+      "min_distance_pixel": 54.32508341792414,
+      "closest_parts": {
+        "object1_part": "head",
+        "object2_part": "front_center",
+        "point1_px": [
+          483.85601806640625,
+          1315.1808349609375
+        ],
+        "point2_px": [
+          536.8035278320312,
+          1327.3371459960938
+        ],
+        "point1_world": [
+          -0.3542645275592804,
+          1.0282083749771118
+        ],
+        "point2_world": [
+          -0.022216342389583588,
+          0.964017927646637
+        ],
+        "description": "head \u2194 front_center"
+      },
+      "heading_analysis": {
+        "relative_heading_rad": 0.5914641526148816,
+        "relative_heading_deg": 33.88839967811433,
+        "approaching": true
+      },
+      "ttc_seconds": 0.00027061806758865714,
+      "pet_seconds": null,
+      "risk_level": "CRITICAL",
+      "description": "person\u7684head \u2194 truck\u7684front_center\uff0c\u8ddd\u79bb0.34m\uff0c\u98ce\u9669\u7b49\u7ea7CRITICAL\uff0c\u9884\u8ba10.0\u79d2\u540e\u78b0\u649e"
+    }
+  },
+  {
+    "frame": 100,
+    "time": 3.3333333333333335,
+    "track_id_1": 11,
+    "track_id_2": 10,
+    "class_1": "person",
+    "class_2": "truck",
+    "distance_pixel": 191.60020999377616,
+    "distance_meters": 1.1339828282523199,
+    "object_classes": [
+      0,
+      7
+    ],
+    "center_1_px": [
+      493.01507568359375,
+      1353.64111328125
+    ],
+    "center_2_px": [
+      424.850341796875,
+      1174.5762939453125
+    ],
+    "center_1_world": [
+      -0.2916341722011566,
+      0.8283849358558655
+    ],
+    "center_2_world": [
+      -0.7870545387268066,
+      1.8484220504760742
+    ],
+    "bbox_1": [
+      493.01507568359375,
+      1353.64111328125,
+      138.93408203125,
+      255.1585693359375
+    ],
+    "bbox_2": [
+      424.850341796875,
+      1174.5762939453125,
+      570.728271484375,
+      336.286376953125
+    ],
+    "positions": {
+      "obj1": {
+        "x": 493.01507568359375,
+        "y": 1353.64111328125
+      },
+      "obj2": {
+        "x": 424.850341796875,
+        "y": 1174.5762939453125
+      }
+    },
+    "positions_world": {
+      "obj1": {
+        "x": -0.2916341722011566,
+        "y": 0.8283849358558655
+      },
+      "obj2": {
+        "x": -0.7870545387268066,
+        "y": 1.8484220504760742
+      }
+    },
+    "multi_anchor": {
+      "closest_parts": [
+        "center",
+        "center"
+      ],
+      "risk_level": "UNKNOWN",
+      "ttc": null
+    },
+    "multi_anchor_detailed": {
+      "min_distance_meters": 0.45611968636512756,
+      "min_distance_pixel": 72.22811995604451,
+      "closest_parts": {
+        "object1_part": "head",
+        "object2_part": "front_center",
+        "point1_px": [
+          493.01507568359375,
+          1251.577685546875
+        ],
+        "point2_px": [
+          424.850341796875,
+          1275.46220703125
+        ],
+        "point1_world": [
+          -0.30577552318573,
+          1.3806291818618774
+        ],
+        "point2_world": [
+          -0.7412373423576355,
+          1.2449156045913696
+        ],
+        "description": "head \u2194 front_center"
+      },
+      "heading_analysis": {
+        "relative_heading_rad": 0.5914641526148816,
+        "relative_heading_deg": 33.88839967811433,
+        "approaching": false
+      },
+      "ttc_seconds": 0.000419152551330626,
+      "pet_seconds": null,
+      "risk_level": "CRITICAL",
+      "description": "person\u7684head \u2194 truck\u7684front_center\uff0c\u8ddd\u79bb0.46m\uff0c\u98ce\u9669\u7b49\u7ea7CRITICAL\uff0c\u9884\u8ba10.0\u79d2\u540e\u78b0\u649e"
+    }
+  }
+]
