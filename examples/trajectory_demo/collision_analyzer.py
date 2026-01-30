@@ -267,13 +267,13 @@ class CollisionAnalyzer:
         # Check if approaching
         approaching = approach_speed < -0.01  # Moving toward each other
         
-        # Calculate TTC regardless of approaching direction
-        # This captures cases where objects are separating but still have collision risk
-        # if they were very close when separation started
-        if abs(approach_speed) > 0.01:  # Only if there's relative motion
+        # Only calculate TTC if objects are actually approaching
+        # Separating objects should not have a collision time
+        if approaching and abs(approach_speed) > 0.01:
             ttc = min_dist / abs(approach_speed)
             return ttc if ttc > 0 else None, approaching
         
+        # Not approaching or no relative motion: no collision risk
         return None, approaching
     
     @staticmethod
