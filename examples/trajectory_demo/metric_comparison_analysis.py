@@ -1,8 +1,8 @@
 """
-指标对比分析工具
+Metric Comparison Analysis Tool
 
-目的: 对比不同指标（PET、TTC、Distance）对碰撞检测精度的影响
-用法: python metric_comparison_analysis.py --results-dir <结果目录> --ground-truth <标注文件>
+Purpose: Compare the impact of different metrics (PET, TTC, Distance) on collision detection accuracy
+Usage: python metric_comparison_analysis.py --results-dir <results_dir> --ground-truth <annotation_file>
 """
 
 import json
@@ -13,13 +13,13 @@ import statistics
 
 
 class MetricComparisonAnalyzer:
-    """对比不同指标的效果"""
+    """Compare the effectiveness of different metrics"""
     
     def __init__(self, results_dir: str, ground_truth_file: str):
         self.results_dir = Path(results_dir)
         self.collision_events_file = self.results_dir / "5_collision_analysis" / "collision_events.json"
         
-        # 加载ground truth
+        # Load ground truth
         with open(ground_truth_file) as f:
             gt_data = json.load(f)
             if isinstance(gt_data, dict) and 'ground_truth_events' in gt_data:
@@ -28,20 +28,20 @@ class MetricComparisonAnalyzer:
                 self.ground_truth = gt_data
     
     def load_detected_events(self) -> List[Dict]:
-        """加载检测事件"""
+        """Load detected events"""
         if not self.collision_events_file.exists():
-            print(f"❌ 未找到检测结果: {self.collision_events_file}")
+            print(f"❌ Detection results not found: {self.collision_events_file}")
             return []
         
         with open(self.collision_events_file) as f:
             return json.load(f)
     
     def get_gt_frames(self) -> set:
-        """获取ground truth中的frame集合"""
+        """Get the set of frames in ground truth"""
         return set(event['frame'] for event in self.ground_truth)
     
     def calculate_metrics(self, detected_frames: set, tp_count: int) -> Dict:
-        """计算Precision、Recall、F1"""
+        """Calculate Precision, Recall, and F1 score"""
         if not detected_frames:
             return {'precision': 0, 'recall': 0, 'f1': 0, 'tp': tp_count}
         
@@ -60,7 +60,7 @@ class MetricComparisonAnalyzer:
         }
     
     def analyze_baseline(self) -> Dict:
-        """基线分析：所有检测的事件"""
+        """Baseline analysis: all detected events"""
         detected = self.load_detected_events()
         detected_frames = set(e['frame'] for e in detected)
         gt_frames = self.get_gt_frames()
@@ -68,17 +68,17 @@ class MetricComparisonAnalyzer:
         tp = len(detected_frames & gt_frames)
         
         return {
-            'scenario': '基线（所有事件）',
+            'scenario': 'Baseline (All Events)',
             'detected_frames': detected_frames,
             'metrics': self.calculate_metrics(detected_frames, tp)
         }
     
     def analyze_ttc_filter(self) -> Dict:
-        """TTC过滤分析：仅保留有TTC值的事件"""
+        """TTC filter analysis: keep only events with TTC values"""
         detected = self.load_detected_events()
         gt_frames = self.get_gt_frames()
         
-        # 筛选有TTC的事件
+        # Filter events with TTC
         events_with_ttc = []
         for e in detected:
             if 'multi_anchor_detailed' in e:
@@ -90,17 +90,17 @@ class MetricComparisonAnalyzer:
         tp = len(detected_frames & gt_frames)
         
         return {
-            'scenario': 'TTC过滤（仅保留TTC>0）',
+            'scenario': 'TTC Filter (TTC > 0 only)',
             'detected_frames': detected_frames,
             'metrics': self.calculate_metrics(detected_frames, tp)
         }
     
     def analyze_pet_filter(self) -> Dict:
-        """PET过滤分析：仅保留有PET值的事件"""
+        """PET filter analysis: keep only events with PET values"""
         detected = self.load_detected_events()
         gt_frames = self.get_gt_frames()
         
-        # 筛选有PET的事件
+        # Filter events with PET
         events_with_pet = []
         for e in detected:
             if 'multi_anchor_detailed' in e:
@@ -112,34 +112,34 @@ class MetricComparisonAnalyzer:
         tp = len(detected_frames & gt_frames)
         
         return {
-            'scenario': 'PET过滤（仅保留PET>0）',
+            'scenario': 'PET Filter (PET > 0 only)',
             'detected_frames': detected_frames,
             'metrics': self.calculate_metrics(detected_frames, tp)
         }
     
     def analyze_distance_threshold(self, threshold: float = 0.5) -> Dict:
-        """距离阈值分析"""
+        """Distance threshold analysis"""
         detected = self.load_detected_events()
         gt_frames = self.get_gt_frames()
         
-        # 筛选距离小于阈值的事件
+        # Filter events with distance below threshold
         events_filtered = [e for e in detected if e.get('distance_meters', float('inf')) <= threshold]
         
         detected_frames = set(e['frame'] for e in events_filtered)
         tp = len(detected_frames & gt_frames)
         
         return {
-            'scenario': f'距离过滤（≤{threshold}m）',
+            'scenario': f'Distance Filter (≤{threshold}m)',
             'detected_frames': detected_frames,
             'metrics': self.calculate_metrics(detected_frames, tp)
         }
     
     def analyze_combined_ttc_pet(self) -> Dict:
-        """组合分析：TTC AND PET"""
+        """Combined analysis: TTC AND PET"""
         detected = self.load_detected_events()
         gt_frames = self.get_gt_frames()
         
-        # 筛选同时有TTC和PET的事件
+        # Filter events with both TTC and PET
         events_combined = []
         for e in detected:
             if 'multi_anchor_detailed' in e:
@@ -153,18 +153,18 @@ class MetricComparisonAnalyzer:
         tp = len(detected_frames & gt_frames)
         
         return {
-            'scenario': '组合过滤（TTC>0 AND PET>0）',
+            'scenario': 'Combined Filter (TTC>0 AND PET>0)',
             'detected_frames': detected_frames,
             'metrics': self.calculate_metrics(detected_frames, tp)
         }
     
     def print_comparison(self):
-        """打印对比结果"""
+        """Print comparison results"""
         print("\n" + "="*100)
-        print("指标对比分析 - 精度效果评估")
+        print("Metric Comparison Analysis - Accuracy Performance Evaluation")
         print("="*100)
         
-        # 执行所有分析
+        # Execute all analyses
         analyses = [
             self.analyze_baseline(),
             self.analyze_ttc_filter(),
@@ -173,8 +173,8 @@ class MetricComparisonAnalyzer:
             self.analyze_combined_ttc_pet()
         ]
         
-        # 打印表格
-        print(f"\n{'场景':<30} {'检测数':>8} {'TP':>5} {'精度':>10} {'召回':>10} {'F1':>10}")
+        # Print table
+        print(f"\n{'Scenario':<30} {'Detected':>8} {'TP':>5} {'Precision':>10} {'Recall':>10} {'F1':>10}")
         print("-" * 100)
         
         baseline_precision = None
@@ -198,8 +198,8 @@ class MetricComparisonAnalyzer:
         
         print("\n" + "="*100)
         
-        # 关键发现
-        print("\n💡 关键发现:")
+        # Key findings
+        print("\n💡 Key Findings:")
         print("-" * 100)
         
         baseline = analyses[0]['metrics']
@@ -207,37 +207,37 @@ class MetricComparisonAnalyzer:
         pet_metrics = analyses[2]['metrics']
         combined_metrics = analyses[4]['metrics']
         
-        print(f"\n1. 基线精度: {baseline['precision']:.2f}% (检测{baseline['detected']}个，TP{baseline['tp']}个)")
-        print(f"   • 假正例太多，不适合作为唯一判断标准\n")
+        print(f"\n1. Baseline Accuracy: {baseline['precision']:.2f}% (Detected {baseline['detected']}, TP {baseline['tp']})")
+        print(f"   • Too many false positives, not suitable as sole criterion\n")
         
-        print(f"2. TTC过滤效果: {ttc_metrics['precision']:.2f}% (检测{ttc_metrics['detected']}个，TP{ttc_metrics['tp']}个)")
-        print(f"   • 精度提升: {ttc_metrics['precision'] - baseline['precision']:+.2f}%")
-        print(f"   • 平衡了覆盖率和精度\n")
+        print(f"2. TTC Filter Effect: {ttc_metrics['precision']:.2f}% (Detected {ttc_metrics['detected']}, TP {ttc_metrics['tp']})")
+        print(f"   • Precision improvement: {ttc_metrics['precision'] - baseline['precision']:+.2f}%")
+        print(f"   • Balanced coverage and precision\n")
         
-        print(f"3. PET过滤效果: {pet_metrics['precision']:.2f}% (检测{pet_metrics['detected']}个，TP{pet_metrics['tp']}个)")
-        print(f"   • 精度提升: {pet_metrics['precision'] - baseline['precision']:+.2f}%")
-        print(f"   • 最高精度，但覆盖率有限\n")
+        print(f"3. PET Filter Effect: {pet_metrics['precision']:.2f}% (Detected {pet_metrics['detected']}, TP {pet_metrics['tp']})")
+        print(f"   • Precision improvement: {pet_metrics['precision'] - baseline['precision']:+.2f}%")
+        print(f"   • Highest precision, but limited coverage\n")
         
         if combined_metrics['detected'] > 0:
-            print(f"4. TTC+PET组合: {combined_metrics['precision']:.2f}% (检测{combined_metrics['detected']}个，TP{combined_metrics['tp']}个)")
-            print(f"   • 精度: {combined_metrics['precision']:.2f}%")
-            print(f"   • 最保守但最可靠的方案\n")
+            print(f"4. TTC+PET Combined: {combined_metrics['precision']:.2f}% (Detected {combined_metrics['detected']}, TP {combined_metrics['tp']})")
+            print(f"   • Precision: {combined_metrics['precision']:.2f}%")
+            print(f"   • Most conservative but most reliable approach\n")
         
-        print("\n建议:")
+        print("\nRecommendations:")
         print("-" * 100)
-        print("  ✓ 优先使用 PET 指标 (精度最高)")
-        print("  ✓ 作为补充使用 TTC 指标 (覆盖率更好)")
-        print("  ✗ 不建议仅使用 Distance 指标 (误检太多)")
-        print("  ✓ 可考虑 TTC + PET 组合 (最保守的方案)")
+        print("  ✓ Prioritize PET metric (highest precision)")
+        print("  ✓ Use TTC metric as supplement (better coverage)")
+        print("  ✗ Not recommended to use Distance metric alone (too many false positives)")
+        print("  ✓ Consider TTC + PET combination (most conservative approach)")
         print("\n" + "="*100 + "\n")
 
 
 def main():
-    parser = argparse.ArgumentParser(description='指标对比分析工具')
+    parser = argparse.ArgumentParser(description='Metric Comparison Analysis Tool')
     parser.add_argument('--results-dir', type=str, required=True,
-                       help='Pipeline结果目录')
+                       help='Pipeline results directory')
     parser.add_argument('--ground-truth', type=str, required=True,
-                       help='Ground Truth标注文件（JSON格式）')
+                       help='Ground Truth annotation file (JSON format)')
     
     args = parser.parse_args()
     

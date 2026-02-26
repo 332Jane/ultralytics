@@ -1,4 +1,10 @@
 """
+config_loader.py
+******MAIN FILE********
+This module loads YAML configuration files to manage various pipeline parameters—including YOLO, 
+Homography, collision detection, and TTC/PET thresholds. It enables users to flexibly adjust these 
+parameters through the configuration file without modifying the source code.
+
 配置管理模块 - 用于加载和管理YAML配置文件
 """
 
@@ -11,7 +17,7 @@ from dataclasses import dataclass
 
 @dataclass
 class VideoConfig:
-    """视频配置"""
+    """Video configuration"""
     path: str
     description: str = ""
     width: int = None
@@ -21,7 +27,7 @@ class VideoConfig:
 
 @dataclass
 class YOLOConfig:
-    """YOLO检测配置"""
+    """YOLO detection configuration"""
     model: str = "yolo11m"
     confidence_threshold: float = 0.45
     skip_frames: int = 3
@@ -29,7 +35,7 @@ class YOLOConfig:
 
 @dataclass
 class HomographyConfig:
-    """Homography配置"""
+    """Homography configuration"""
     enabled: bool = True
     matrix_file: str = None
     calibration_points: list = None
@@ -37,7 +43,7 @@ class HomographyConfig:
 
 @dataclass
 class CollisionConfig:
-    """碰撞检测配置"""
+    """Collision detection configuration"""
     proximity_threshold_m: float = 4.5
     anchor_distance_threshold_m: float = 1.0
     vertex_shrink: float = 0.75
@@ -45,7 +51,7 @@ class CollisionConfig:
 
 @dataclass
 class TTCPETConfig:
-    """TTC和PET配置"""
+    """TTC and PET configuration"""
     rear_end_serious: float = 2.8
     rear_end_general: float = 4.7
     sideswipe_serious: float = 2.3
@@ -55,7 +61,7 @@ class TTCPETConfig:
 
 @dataclass
 class OutputConfig:
-    """输出配置"""
+    """Output configuration"""
     save_yolo_detection: bool = True
     save_keyframes: bool = True
     generate_pdf: bool = True
@@ -65,7 +71,7 @@ class OutputConfig:
 
 @dataclass
 class ReportConfig:
-    """报告配置"""
+    """Report configuration"""
     max_events_in_report: int = 10
     include_filtered_events: bool = True
     events_per_page_pdf: int = 3
@@ -73,7 +79,7 @@ class ReportConfig:
 
 @dataclass
 class AdvancedConfig:
-    """高级配置"""
+    """Advanced configuration"""
     min_track_length: int = 3
     track_gap_threshold: int = 4
     merge_same_frame_objects: bool = True
@@ -81,14 +87,14 @@ class AdvancedConfig:
 
 
 class ConfigLoader:
-    """配置加载器"""
+    """Configuration loader"""
     
     def __init__(self, config_path: str):
         """
-        初始化配置加载器
+        Initialize the configuration loader
         
         Args:
-            config_path: YAML配置文件路径
+            config_path: Path to YAML configuration file
         """
         self.config_path = Path(config_path)
         if not self.config_path.exists():
@@ -100,8 +106,8 @@ class ConfigLoader:
         self._parse_config()
     
     def _parse_config(self):
-        """解析配置文件"""
-        # 视频配置
+        """Parse configuration file"""
+        # Video configuration
         video_dict = self.raw_config.get('video', {})
         self.video = VideoConfig(
             path=video_dict.get('path'),
@@ -111,7 +117,7 @@ class ConfigLoader:
             fps=video_dict.get('fps', 30)
         )
         
-        # YOLO配置
+        # YOLO configuration
         yolo_dict = self.raw_config.get('yolo', {})
         self.yolo = YOLOConfig(
             model=yolo_dict.get('model', 'yolo11m'),
@@ -119,7 +125,7 @@ class ConfigLoader:
             skip_frames=yolo_dict.get('skip_frames', 3)
         )
         
-        # Homography配置
+        # Homography configuration
         homo_dict = self.raw_config.get('homography', {})
         self.homography = HomographyConfig(
             enabled=homo_dict.get('enabled', True),
@@ -127,7 +133,7 @@ class ConfigLoader:
             calibration_points=homo_dict.get('calibration_points', [])
         )
         
-        # 碰撞检测配置
+        # Collision detection configuration
         collision_dict = self.raw_config.get('collision', {})
         self.collision = CollisionConfig(
             proximity_threshold_m=collision_dict.get('proximity_threshold_m', 4.5),
@@ -135,7 +141,7 @@ class ConfigLoader:
             vertex_shrink=collision_dict.get('vertex_shrink', 0.75)
         )
         
-        # TTC和PET配置
+        # TTC and PET configuration
         ttc_pet_dict = self.raw_config.get('ttc_pet', {})
         thresholds = ttc_pet_dict.get('ttc_thresholds', {})
         self.ttc_pet = TTCPETConfig(
@@ -146,7 +152,7 @@ class ConfigLoader:
             safety_margin_m=ttc_pet_dict.get('safety_margin_m', 1.5)
         )
         
-        # 输出配置
+        # Output configuration
         output_dict = self.raw_config.get('output', {})
         self.output = OutputConfig(
             save_yolo_detection=output_dict.get('save_yolo_detection', True),
@@ -156,7 +162,7 @@ class ConfigLoader:
             output_dir=output_dict.get('output_dir')
         )
         
-        # 报告配置
+        # Report configuration
         report_dict = self.raw_config.get('report', {})
         self.report = ReportConfig(
             max_events_in_report=report_dict.get('max_events_in_report', 10),
@@ -164,7 +170,7 @@ class ConfigLoader:
             events_per_page_pdf=report_dict.get('events_per_page_pdf', 3)
         )
         
-        # 高级配置
+        # Advanced configuration
         advanced_dict = self.raw_config.get('advanced', {})
         self.advanced = AdvancedConfig(
             min_track_length=advanced_dict.get('min_track_length', 3),
@@ -175,15 +181,15 @@ class ConfigLoader:
     
     def get_homography_matrix(self) -> Tuple[np.ndarray, float]:
         """
-        获取或计算homography矩阵
+        Get or compute the homography matrix
         
         Returns:
-            (H矩阵, 缩放因子)
+            (H matrix, scale factor)
         
         Raises:
-            ValueError: 如果标定点不足
+            ValueError: If calibration points are insufficient
         """
-        # 如果提供了矩阵文件，则加载
+        # Load if matrix file is provided
         if self.homography.matrix_file:
             import json
             with open(self.homography.matrix_file, 'r') as f:
@@ -192,11 +198,11 @@ class ConfigLoader:
                 scale = data.get('scale', 1.0)
                 return H, scale
         
-        # 否则使用标定点计算
+        # Otherwise compute using calibration points
         if not self.homography.calibration_points or len(self.homography.calibration_points) < 4:
-            raise ValueError(f"Homography标定点不足：需要至少4个点，现有{len(self.homography.calibration_points or [])}个")
+            raise ValueError(f"Insufficient homography calibration points: need at least 4, have {len(self.homography.calibration_points or [])}")
         
-        # 提取像素坐标和世界坐标
+        # Extract pixel and world coordinates
         src_points = []
         dst_points = []
         
@@ -208,20 +214,20 @@ class ConfigLoader:
                 dst_points.append(world)
         
         if len(src_points) < 4:
-            raise ValueError(f"有效标定点不足：需要至少4个点，现有{len(src_points)}个")
+            raise ValueError(f"Insufficient valid calibration points: need at least 4, have {len(src_points)}")
         
         src_points = np.array(src_points, dtype=np.float32)
         dst_points = np.array(dst_points, dtype=np.float32)
         
-        # 使用OpenCV计算homography矩阵
+        # Compute homography matrix using OpenCV
         import cv2
         H, _ = cv2.findHomography(src_points, dst_points)
         
         if H is None:
-            raise ValueError("无法计算homography矩阵，标定点可能不合适")
+            raise ValueError("Failed to compute homography matrix, calibration points may be unsuitable")
         
-        # 计算缩放因子（像素/米）
-        # 使用第一和第二个点之间的距离比
+        # Calculate scale factor (pixels/meter)
+        # Use distance ratio between first and second points
         pixel_dist_1_2 = np.linalg.norm(src_points[1] - src_points[0])
         world_dist_1_2 = np.linalg.norm(dst_points[1] - dst_points[0])
         scale = pixel_dist_1_2 / world_dist_1_2 if world_dist_1_2 > 0 else 1.0
@@ -229,42 +235,42 @@ class ConfigLoader:
         return H, scale
     
     def print_config(self):
-        """打印配置摘要"""
+        """Print configuration summary"""
         print("\n" + "="*70)
-        print("配置加载成功")
+        print("Configuration loaded successfully")
         print("="*70)
-        print(f"\n【视频】")
-        print(f"  路径: {self.video.path}")
-        print(f"  描述: {self.video.description}")
+        print(f"\n[Video]")
+        print(f"  Path: {self.video.path}")
+        print(f"  Description: {self.video.description}")
         if self.video.width and self.video.height:
-            print(f"  分辨率: {self.video.width}x{self.video.height}")
-        print(f"  帧率: {self.video.fps} fps")
+            print(f"  Resolution: {self.video.width}x{self.video.height}")
+        print(f"  Frame rate: {self.video.fps} fps")
         
-        print(f"\n【YOLO检测】")
-        print(f"  模型: {self.yolo.model}")
-        print(f"  置信度: {self.yolo.confidence_threshold}")
-        print(f"  跳帧: 每{self.yolo.skip_frames}帧处理一帧")
+        print(f"\n[YOLO Detection]")
+        print(f"  Model: {self.yolo.model}")
+        print(f"  Confidence: {self.yolo.confidence_threshold}")
+        print(f"  Skip frames: process 1 of {self.yolo.skip_frames} frames")
         
-        print(f"\n【碰撞检测】")
-        print(f"  接近距离阈值: {self.collision.proximity_threshold_m}m")
-        print(f"  锚点距离阈值: {self.collision.anchor_distance_threshold_m}m")
-        print(f"  顶点收缩因子: {self.collision.vertex_shrink}")
+        print(f"\n[Collision Detection]")
+        print(f"  Proximity threshold: {self.collision.proximity_threshold_m}m")
+        print(f"  Anchor distance threshold: {self.collision.anchor_distance_threshold_m}m")
+        print(f"  Vertex shrink factor: {self.collision.vertex_shrink}")
         
         if self.homography.enabled:
-            print(f"\n【Homography】")
+            print(f"\n[Homography]")
             if self.homography.matrix_file:
-                print(f"  矩阵文件: {self.homography.matrix_file}")
+                print(f"  Matrix file: {self.homography.matrix_file}")
             else:
-                print(f"  标定点数: {len(self.homography.calibration_points or [])}")
+                print(f"  Calibration points: {len(self.homography.calibration_points or [])}")
         
         print("\n" + "="*70 + "\n")
 
 
 if __name__ == '__main__':
-    # 测试
+    # Test
     import sys
     if len(sys.argv) > 1:
         loader = ConfigLoader(sys.argv[1])
         loader.print_config()
     else:
-        print("使用方法: python config_loader.py <config_file.yaml>")
+        print("Usage: python config_loader.py <config_file.yaml>")

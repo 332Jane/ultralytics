@@ -1,130 +1,130 @@
-# 碰撞检测管道 - 视频配置文件模板
-# 使用此文件配置不同视频的参数，包括homography标注点
+# Collision Detection Pipeline - Video Configuration File Template
+# Use this file to configure parameters for different videos, including Homography calibration points
 
-# 视频基本信息
+# Video basic information
 video:
-  # 视频文件路径
+  # Video file path
   path: "videos/your_video.mp4"
   
-  # 视频描述
-  description: "测试视频描述"
+  # Video description
+  description: "Test video description"
   
-  # 视频分辨率 (可选，如果指定则会进行验证)
+  # Video resolution (optional, validated if specified)
   resolution:
     width: 1280
     height: 720
   
-  # 视频帧率 (可选，用于时间计算)
+  # Video frame rate (optional, used for time calculations)
   fps: 30
 
-# YOLO检测参数
+# YOLO detection parameters
 yolo:
-  # 使用的YOLO模型 (yolo11n, yolo11m, yolo11l, yolo11x)
+  # YOLO model variant (yolo11n, yolo11m, yolo11l, yolo11x)
   model: "yolo11m"
   
-  # 置信度阈值 (0-1)
+  # Confidence threshold (0-1, lower = more detections)
   confidence_threshold: 0.45
   
-  # 跳帧数 (处理每第N帧，值越大处理越快但可能遗漏事件)
+  # Frame skip factor (process every Nth frame, higher = faster but may miss events)
   skip_frames: 3
 
-# Homography 标定信息
+# Homography calibration information
 homography:
-  # 是否使用homography变换
+  # Enable/disable Homography transformation
   enabled: true
   
-  # Homography矩阵文件路径 (如果为空则使用标注点自动计算)
+  # Homography matrix file path (if empty, compute from calibration points)
   # matrix_file: "calibration/your_video_homography.json"
   
-  # 标注点方法：使用像素坐标和对应的世界坐标
-  # 至少需要4个点对来计算homography
+  # Calibration points method: map pixel coordinates to world coordinates
+  # Requires at least 4 point pairs to compute Homography matrix
   calibration_points:
-    # 每个点包含：像素坐标 (x, y) 和世界坐标 (x_m, y_m，单位：米)
-    # 示例：场景中距离摄像机5米的地面点，在图像中的坐标是(640, 400)
-    - name: "近处左侧"
-      pixel: [100, 500]      # 图像中的坐标
-      world: [0.5, 2.0]      # 世界坐标 (单位：米)
+    # Each point contains: pixel coordinates (x, y) and world coordinates (x_m, y_m in meters)
+    # Example: point 5 meters from camera on ground, appearing at (640, 400) in image
+    - name: "Near left corner"
+      pixel: [100, 500]        # Image coordinates
+      world: [0.5, 2.0]        # World coordinates (unit: meters)
     
-    - name: "近处右侧"
+    - name: "Near right corner"
       pixel: [1180, 500]
       world: [5.0, 2.0]
     
-    - name: "远处左侧"
+    - name: "Far left corner"
       pixel: [300, 200]
       world: [0.5, 10.0]
     
-    - name: "远处右侧"
+    - name: "Far right corner"
       pixel: [980, 200]
       world: [5.0, 10.0]
     
-    # 可以添加更多点来提高精度
-    # - name: "中心点"
+    # Can add more points for better accuracy
+    # - name: "Center point"
     #   pixel: [640, 350]
     #   world: [2.75, 6.0]
 
-# 碰撞检测参数
+# Collision detection parameters
 collision:
-  # 接近事件的距离阈值 (单位：米)
+  # Distance threshold for proximity events (unit: meters)
   proximity_threshold_m: 4.5
   
-  # 多锚点距离过滤阈值 (单位：米，仅保留 <= 此值的事件)
+  # Multi-anchor point distance filter threshold (unit: meters, keep only <= this value)
   anchor_distance_threshold_m: 1.0
   
-  # 锚点顶点收缩因子 (0-1，越小越接近物体中心)
-  # 0.75 = 距离中心3/4处
+  # Anchor point vertex shrink factor (0-1, smaller = closer to object center)
+  # 0.75 = 3/4 distance from center
   vertex_shrink: 0.75
 
-# TTC和PET参数
+# TTC and PET parameters
 ttc_pet:
-  # TTC分级标准 (单位：秒)
+  # TTC severity thresholds (unit: seconds)
   ttc_thresholds:
-    rear_end_serious: 2.8      # Rear-end 严重冲突: 0-2.8s
-    rear_end_general: 4.7      # Rear-end 一般冲突: 2.8-4.7s
-    sideswipe_serious: 2.3     # Sideswipe 严重冲突: 0-2.3s
-    sideswipe_general: 4.2     # Sideswipe 一般冲突: 2.3-4.2s
+    rear_end_serious: 2.8       # Rear-end serious collision: 0-2.8s
+    rear_end_general: 4.7       # Rear-end general collision: 2.8-4.7s
+    sideswipe_serious: 2.3      # Sideswipe serious collision: 0-2.3s
+    sideswipe_general: 4.2      # Sideswipe general collision: 2.3-4.2s
   
-  # PET参数
-  safety_margin_m: 1.5         # 安全边界（计算PET时的虚拟碰撞区域）
+  # PET parameters
+  safety_margin_m: 1.5          # Safety margin for PET calculation (virtual collision zone)
 
-# 输出配置
+# Output configuration
 output:
-  # 是否生成YOLO检测可视化图片
+  # Generate YOLO detection visualization images
   save_yolo_detection: true
   
-  # 是否生成关键帧图片
+  # Generate keyframe images with collision events
   save_keyframes: true
   
-  # 是否生成PDF报告（含图片）
+  # Generate PDF report (includes images)
   generate_pdf: true
   
-  # 是否生成JSON数据文件
+  # Generate JSON data files
   save_json: true
   
-  # 输出目录 (相对路径或绝对路径)
-  # 如果为空则使用默认的results/日期时间目录
+  # Output directory (relative or absolute path)
+  # If empty, use default results/datetime directory
   # output_dir: "results/my_custom_output"
 
-# 报告配置
+# Report configuration
 report:
-  # 报告中显示的最大事件数
+  # Maximum number of events to display in report
   max_events_in_report: 10
   
-  # 是否在报告中包含被过滤的事件
+  # Include filtered-out events in report
   include_filtered_events: true
   
-  # PDF中每页显示的事件数
+  # Number of events per page in PDF report
   events_per_page_pdf: 3
 
-# 高级参数 (可选)
+# Advanced parameters (optional)
 advanced:
-  # 轨迹连续性过滤（最小轨迹长度，单位：帧）
+  # Trajectory continuity filter (minimum track length in frames)
   min_track_length: 3
   
-  # 轨迹间断检测阈值（单位：帧）
+  # Trajectory gap detection threshold (unit: frames)
   track_gap_threshold: 4
   
-  # 是否进行同帧物体分割合并
+  # Enable/disable same-frame object merging
   merge_same_frame_objects: true
   
-  # 同帧物体合并距离阈值（单位：像素）
+  # Same-frame object merge distance threshold (unit: pixels)
   merge_distance_threshold_px: 100

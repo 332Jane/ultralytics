@@ -86,7 +86,7 @@ class YOLOFirstPipelineA:
         # 创建带视频文件名和日期的输出目录
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         video_filename = Path(video_path).stem  # 获取视频文件名（不含扩展名）
-        self.run_dir = (self.output_base / f"{video_filename}_{timestamp}_yolo_first_method_a").resolve()
+        self.run_dir = (self.output_base / f"{video_filename}_{timestamp}").resolve()
         
         # 创建子目录结构
         self.detection_dir = self.run_dir / "1_yolo_detection"
@@ -1963,7 +1963,13 @@ class YOLOFirstPipelineA:
     def generate_report(self, proximity_events, analyzed_events, level_counts):
         """Generate final analysis report (improved: dynamic TTC classification, with PDF output)"""
         report_path = self.analysis_dir / 'analysis_report.txt'
-        pdf_path = self.analysis_dir / 'analysis_report_with_images.pdf'
+        
+        # Generate PDF filename: {video_name}_{timestamp}.pdf
+        from pathlib import Path
+        video_name = Path(self.video_path).stem  # Get filename without extension
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        pdf_filename = f'{video_name}_{timestamp}.pdf'
+        pdf_path = self.analysis_dir / pdf_filename
         
         # Helper function: format TTC values (supports millisecond display)
         def format_ttc(ttc_seconds):
@@ -2186,7 +2192,7 @@ class YOLOFirstPipelineA:
         self._generate_pdf_report(analyzed_events, ttc_classified, pdf_path, find_keyframe, format_ttc)
     
     def _generate_pdf_report(self, analyzed_events, ttc_classified, pdf_path, find_keyframe_func, format_ttc_func):
-        """生成包含图片的PDF报告"""
+        """Generate PDF report with images - Summary first, then detailed events with images"""
         try:
             from reportlab.lib.pagesizes import letter, A4
             from reportlab.lib.units import inch
@@ -2194,83 +2200,156 @@ class YOLOFirstPipelineA:
             from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
             from reportlab.lib.enums import TA_CENTER, TA_LEFT
             from reportlab.lib import colors
+            from PIL import Image as PILImage
             
-            # 创建PDF文档
+            # Create PDF document
             doc = SimpleDocTemplate(str(pdf_path), pagesize=A4, topMargin=0.5*inch, bottomMargin=0.5*inch)
             story = []
             styles = getSampleStyleSheet()
             
-            # 自定义样式
+            # Custom styles
             title_style = ParagraphStyle(
                 'CustomTitle',
                 parent=styles['Heading1'],
-                fontSize=16,
+                fontSize=18,
                 textColor=colors.HexColor('#000000'),
-                spaceAfter=10,
+                spaceAfter=15,
                 alignment=TA_CENTER
             )
             
             heading_style = ParagraphStyle(
                 'CustomHeading',
                 parent=styles['Heading2'],
-                fontSize=12,
+                fontSize=13,
                 textColor=colors.HexColor('#1a1a1a'),
-                spaceAfter=8
+                spaceAfter=10,
+                spaceBefore=10
             )
             
-            # 添加标题
+            normal_style = ParagraphStyle(
+                'Normal',
+                parent=styles['Normal'],
+                fontSize=10,
+                spaceAfter=6
+            )
+            
+            # ========== PAGE 1: SUMMARY ==========
             from datetime import datetime
-            story.append(Paragraph("碰撞检测分析报告（含图片）", title_style))
-            story.append(Paragraph(f"生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", styles['Normal']))
+            story.append(Paragraph("Collision Detection Analysis Report", title_style))
+            story.append(Paragraph(f"Generation Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", normal_style))
             story.append(Spacer(1, 0.3*inch))
             
-            # 添加高风险事件和对应的keyframe图片
-            all_high_risk = (ttc_classified.get('rear_end_serious', []) + 
-                            ttc_classified.get('rear_end_general', []) +
-                            ttc_classified.get('sideswipe_serious', []) +
-                            ttc_classified.get('sideswipe_general', []))
+            # Summary statistics
+            story.append(Paragraph("Summary Statistics", heading_style))
+            
+            # Count events by type
+            rear_serious = ttc_classified.get('rear_end_serious', [])
+            rear_general = ttc_classified.get('rear_end_general', [])
+            side_serious = ttc_classified.get('sideswipe_serious', [])
+            side_general = ttc_classified.get('sideswipe_general', [])
+            already_passed = ttc_classified.get('already_passed_close_call', [])
+            near_miss_pet = ttc_classified.get('near_miss_pet', [])
+            
+            summary_data = [
+                ['Collision Type', 'Serious Risk', 'General Risk', 'Total'],
+                ['Rear-end', str(len(rear_serious)), str(len(rear_general)), str(len(rear_serious) + len(rear_general))],
+                ['Sideswipe', str(len(side_serious)), str(len(side_general)), str(len(side_serious) + len(side_general))],
+                ['Already Passed (Close)', '-', '-', str(len(already_passed))],
+                ['Near Miss (PET)', '-', '-', str(len(near_miss_pet))],
+            ]
+            
+            summary_table = Table(summary_data, colWidths=[2*inch, 1.2*inch, 1.2*inch, 1.2*inch])
+            summary_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4472C4')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 11),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('FONTSIZE', (0, 1), (-1, -1), 10),
+            ]))
+            story.append(summary_table)
+            story.append(Spacer(1, 0.3*inch))
+            
+            # Overall event counts
+            story.append(Paragraph("Overall Event Breakdown", heading_style))
+            overall_text = f"""
+            <b>Total Proximity Events:</b> {len(analyzed_events)}<br/>
+            <b>High-Risk Events:</b> {len(rear_serious) + len(rear_general) + len(side_serious) + len(side_general)}<br/>
+            <b>Close-Call Events:</b> {len(already_passed)}<br/>
+            <b>Near-Miss Events:</b> {len(near_miss_pet)}<br/>
+            """
+            story.append(Paragraph(overall_text, normal_style))
+            story.append(Spacer(1, 0.2*inch))
+            
+            # Add page break before detailed events
+            story.append(PageBreak())
+            
+            # ========== SUBSEQUENT PAGES: DETAILED EVENTS WITH IMAGES ==========
+            all_high_risk = rear_serious + rear_general + side_serious + side_general
             
             if all_high_risk:
-                story.append(Paragraph("高风险碰撞事件", heading_style))
+                story.append(Paragraph("High-Risk Collision Events - Detailed Analysis", heading_style))
                 story.append(Spacer(1, 0.2*inch))
                 
-                for idx, event in enumerate(all_high_risk[:10], 1):  # 最多显示10个
+                for idx, event in enumerate(all_high_risk[:10], 1):  # Display maximum 10 events
                     frame = event['frame']
                     ttc = event['multi_anchor_detailed'].get('ttc_seconds')
                     dist = event['multi_anchor_detailed'].get('min_distance_meters', 0)
                     track_id_1 = event.get('track_id_1', -1)
                     track_id_2 = event.get('track_id_2', -1)
+                    time_s = event.get('time', 0)
                     
-                    # 添加事件信息
-                    ttc_str = format_ttc_func(ttc) if ttc and ttc > 0 else "远离"
-                    event_text = f"Frame {frame}: ID{track_id_1}+ID{track_id_2} | TTC={ttc_str} | 距离={dist:.2f}m"
-                    story.append(Paragraph(event_text, styles['Normal']))
+                    # Add event information header
+                    ttc_str = format_ttc_func(ttc) if ttc and ttc > 0 else "Separating"
+                    event_text = f"<b>Event {idx}: Frame {frame} ({time_s:.2f}s) | ID{track_id_1} ↔ ID{track_id_2}</b><br/>TTC: {ttc_str} | Distance: {dist:.3f}m"
+                    story.append(Paragraph(event_text, normal_style))
+                    story.append(Spacer(1, 0.15*inch))
                     
-                    # 查找并添加keyframe图片
+                    # Find and add keyframe image with original aspect ratio
                     keyframe_path = find_keyframe_func(frame, track_id_1, track_id_2)
                     if keyframe_path and keyframe_path.exists():
                         try:
-                            img = Image(str(keyframe_path), width=6*inch, height=4.5*inch)
+                            # Get image dimensions to maintain aspect ratio
+                            pil_img = PILImage.open(str(keyframe_path))
+                            img_width, img_height = pil_img.size
+                            aspect_ratio = img_height / img_width
+                            
+                            # Set max width to fit page (A4 is 8.27 inches, with 0.5 inch margins = 7.27 inches)
+                            max_width = 6.5 * inch
+                            calc_height = max_width * aspect_ratio
+                            
+                            # Limit height to prevent overflow
+                            max_height = 4.0 * inch
+                            if calc_height > max_height:
+                                calc_height = max_height
+                                calc_width = calc_height / aspect_ratio
+                            else:
+                                calc_width = max_width
+                            
+                            img = Image(str(keyframe_path), width=calc_width, height=calc_height)
                             story.append(img)
                         except Exception as e:
-                            story.append(Paragraph(f"[无法加载图片: {keyframe_path.name}]", styles['Normal']))
+                            story.append(Paragraph(f"[Unable to load image: {keyframe_path.name}]", normal_style))
                     else:
-                        story.append(Paragraph(f"[未找到keyframe图片]", styles['Normal']))
+                        story.append(Paragraph(f"[Keyframe image not found]", normal_style))
                     
-                    story.append(Spacer(1, 0.2*inch))
+                    story.append(Spacer(1, 0.25*inch))
                     
-                    # 每3个事件后添加分页
-                    if (idx) % 3 == 0:
+                    # Add page break after every 2 events (to avoid crowding)
+                    if (idx) % 2 == 0 and idx < len(all_high_risk[:10]):
                         story.append(PageBreak())
             
-            # 构建PDF
+            # Build PDF
             doc.build(story)
-            print(f"  ✓ PDF报告已保存: {pdf_path.name}")
+            print(f"  ✓ PDF Report saved: {pdf_path.name}")
             
         except ImportError:
-            print(f"  ⚠️  缺少reportlab库，跳过PDF生成。可运行: pip install reportlab")
+            print(f"  ⚠️  Missing reportlab library, skipping PDF generation. Run: pip install reportlab")
         except Exception as e:
-            print(f"  ⚠️  PDF生成失败: {e}")
+            print(f"  ⚠️  PDF generation failed: {e}")
     
     def _get_filter_reason(self, event):
         """Get the reason why an event was filtered"""

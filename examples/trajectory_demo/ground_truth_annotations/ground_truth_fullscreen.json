@@ -1,0 +1,111 @@
+{
+   "_metadata": {
+    "description": "Ground Truth Annotations for Model Evaluation",
+    "video": "Homograph_Teset_FullScreen.mp4",
+    "total_annotated": 11,
+    "true_collisions": 4,
+    "false_positives": 7,
+    "annotation_tool": "manual/quick_annotation.py"
+  },
+
+
+  
+  "ground_truth_events": [
+    {
+      "frame": 67,
+      "track_id_1": 9,
+      "track_id_2": 10,
+      "is_collision": true,
+      "distance_meters": 1.6261713002157914,
+      "reason": "TTC or PET exists"
+    },
+    {
+      "frame": 76,
+      "track_id_1": 7,
+      "track_id_2": 9,
+      "is_collision": true,
+      "distance_meters": 1.9225411216925214,
+      "reason": "TTC or PET exists"
+    },
+    {
+      "frame": 91,
+      "track_id_1": 11,
+      "track_id_2": 10,
+      "is_collision": true,
+      "distance_meters": 2.0501286807488754,
+      "reason": "TTC or PET exists"
+    },
+    {
+      "frame": 97,
+      "track_id_1": 11,
+      "track_id_2": 10,
+      "is_collision": true,
+      "distance_meters": 1.113231851203636,
+      "reason": "TTC or PET exists"
+    }
+  ],
+  "false_positives": [
+    {
+      "frame": 67,
+      "track_id_1": 7,
+      "track_id_2": 9,
+      "is_collision": null,
+      "distance_meters": 1.636543563971543,
+      "reason": "No TTC/PET metrics"
+    },
+    {
+      "frame": 70,
+      "track_id_1": 7,
+      "track_id_2": 9,
+      "is_collision": null,
+      "distance_meters": 1.6723520924068103,
+      "reason": "No TTC/PET metrics"
+    },
+    {
+      "frame": 73,
+      "track_id_1": 7,
+      "track_id_2": 9,
+      "is_collision": null,
+      "distance_meters": 1.7209044828340365,
+      "reason": "No TTC/PET metrics"
+    },
+    {
+      "frame": 79,
+      "track_id_1": 7,
+      "track_id_2": 9,
+      "is_collision": null,
+      "distance_meters": 1.9557409887959172,
+      "reason": "No TTC/PET metrics"
+    },
+    {
+      "frame": 94,
+      "track_id_1": 11,
+      "track_id_2": 10,
+      "is_collision": null,
+      "distance_meters": 1.5298160156171285,
+      "reason": "No TTC/PET metrics"
+    },
+    {
+      "frame": 100,
+      "track_id_1": 11,
+      "track_id_2": 10,
+      "is_collision": null,
+      "distance_meters": 1.1339828282523199,
+      "reason": "No TTC/PET metrics"
+    },
+    {
+      "frame": 103,
+      "track_id_1": 11,
+      "track_id_2": 10,
+      "is_collision": null,
+      "distance_meters": 1.6101164723387784,
+      "reason": "No TTC/PET metrics"
+    }
+  ],
+  "statistics": {
+    "total_annotated": 11,
+    "true_collisions": 4,
+    "false_positives": 7,
+    "annotation_tool": "quick_annotation.py (Automatic)"
+  }
+}

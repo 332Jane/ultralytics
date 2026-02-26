@@ -1,27 +1,86 @@
 """
 visualize_contact_points.py
 
-可视化接触点碰撞分析结果
-============================================
+================================================================================
+CONTACT POINT COLLISION ANALYSIS VISUALIZATION
+================================================================================
 
-功能：
-1. 加载 near_misses.json 和 tracks.json
-2. 可视化最危险的碰撞事件
-3. 在原视频上绘制接触点和距离信息
-4. 生成统计图表
+PURPOSE:
+  This script analyzes and visualizes collision detection results with focus
+  on contact points between objects. It generates statistical reports and
+  charts to understand collision patterns without requiring video files.
 
-使用：
-python visualize_contact_points.py \
-  --near-misses runs/trajectory_demo/xxx/near_misses.json \
-  --tracks runs/trajectory_demo/xxx/tracks.json \
-  --video videos/test.mp4 \
-  --output visualization/
+FUNCTIONALITY:
+  - Loads collision events and object trajectory data
+  - Analyzes contact point statistics (front, center, back)
+  - Generates comprehensive statistical plots:
+    * Distance distribution histogram
+    * Time-to-Collision (TTC) distribution
+    * Contact point type frequency
+    * Temporal distribution of near-miss events
+  - Creates summary statistics by object pair
+  - Identifies high-risk collision scenarios
+  - Lightweight analysis (no video processing required)
 
-或简单模式（只分析数据，不画视频）：
-python visualize_contact_points.py \
-  --near-misses runs/trajectory_demo/xxx/near_misses.json \
-  --tracks runs/trajectory_demo/xxx/tracks.json \
-  --analyze-only
+USAGE:
+  Full analysis with plots:
+    python visualize_contact_points.py \
+      --near-misses results/xxx/5_collision_analysis/collision_events.json \
+      --tracks results/xxx/5_collision_analysis/tracks.json \
+      --output analysis_results/
+
+  Data analysis only (no visualization):
+    python visualize_contact_points.py \
+      --near-misses collision_events.json \
+      --tracks tracks.json \
+      --analyze-only
+
+PARAMETERS:
+  --near-misses <path>     : Path to collision events JSON file (REQUIRED)
+  --tracks <path>          : Path to object trajectories JSON file (REQUIRED)
+  --output <path>          : Output directory for plots and reports
+                             (Default: visualization/)
+  --analyze-only           : Only perform analysis, skip plot generation
+                             (useful for quick data inspection)
+
+OUTPUT:
+  Files generated:
+    - contact_points_analysis.png  : 4-subplot analysis chart
+    - Console output               : Detailed statistics and rankings
+
+  Chart contents (4 subplots):
+    1. Distance Distribution      : Histogram of all collision distances
+    2. TTC Distribution           : Histogram of Time-to-Collision values
+    3. Contact Point Types        : Bar chart of contact point combinations
+    4. Temporal Distribution      : Scatter plot showing events over time
+
+ANALYSIS FEATURES:
+  - Contact point type statistics (front-front, center-back, etc.)
+  - High-risk events filtering (TTC < 3 seconds)
+  - Top closest contact points ranking
+  - Object pair interaction analysis
+  - Event frequency distribution
+
+OUTPUT STATISTICS:
+  Contact Point Types:
+    F = Front (leading edge of vehicle)
+    C = Center (center point of object)
+    B = Back (trailing edge of vehicle)
+
+  Risk Classification:
+    - Very High: TTC < 0.5s
+    - High:      TTC < 2.0s
+    - Medium:    TTC 2.0-3.0s
+    - Low:       TTC > 3.0s
+
+ADVANTAGES:
+  ✓ Fast execution (no video processing)
+  ✓ Comprehensive statistical analysis
+  ✓ Helps identify collision patterns
+  ✓ Useful for algorithm validation
+  ✓ Generates publication-ready plots
+
+================================================================================
 """
 
 import json
@@ -34,13 +93,19 @@ from pathlib import Path
 
 
 def analyze_contact_points(near_misses_path, tracks_path):
-    """分析接触点碰撞数据"""
+    """
+    Analyze contact point collision data and print comprehensive statistics
+    
+    Parameters:
+      near_misses_path: Path to collision events JSON
+      tracks_path: Path to object trajectories JSON
+    """
     
     print("=" * 60)
     print("Contact Point Analysis")
     print("=" * 60)
     
-    # 加载数据
+    # Load data
     with open(near_misses_path, 'r') as f:
         near_misses = json.load(f)
     
@@ -54,7 +119,7 @@ def analyze_contact_points(near_misses_path, tracks_path):
         print("⚠ No near-miss events found")
         return
     
-    # 【新增分析】按接触点类型统计
+    # Contact point type statistics
     print("【Contact Point Statistics】")
     print("-" * 60)
     
@@ -72,7 +137,7 @@ def analyze_contact_points(near_misses_path, tracks_path):
     else:
         print("  No contact point data (using fallback center distance)")
     
-    # 分析危险碰撞
+    # High-risk collision analysis
     print("\n【High-Risk Events (TTC < 3s)】")
     print("-" * 60)
     
@@ -80,7 +145,7 @@ def analyze_contact_points(near_misses_path, tracks_path):
     print(f"Total high-risk events: {len(collision_risks)}")
     
     if collision_risks:
-        # 按距离排序
+        # Sort by distance
         sorted_by_distance = sorted(collision_risks, key=lambda x: x['distance'])
         print("\nTop 5 closest contact points:")
         for i, event in enumerate(sorted_by_distance[:5], 1):
@@ -99,7 +164,7 @@ def analyze_contact_points(near_misses_path, tracks_path):
                 print(f"     Distance: {dist:.2f} units")
                 print(f"     TTC: {ttc:.2f}s")
     
-    # 按物体对统计
+    # Object pair statistics
     print("\n【Object Pair Statistics】")
     print("-" * 60)
     
@@ -119,7 +184,13 @@ def analyze_contact_points(near_misses_path, tracks_path):
 
 
 def create_summary_plot(near_misses_path, output_dir):
-    """生成统计图表"""
+    """
+    Generate comprehensive statistical plots from collision data
+    
+    Parameters:
+      near_misses_path: Path to collision events JSON
+      output_dir: Directory where plots will be saved
+    """
     
     with open(near_misses_path, 'r') as f:
         near_misses = json.load(f)
@@ -128,14 +199,14 @@ def create_summary_plot(near_misses_path, output_dir):
         print("No data to plot")
         return
     
-    # 准备数据
+    # Prepare data
     distances = [nm['distance'] for nm in near_misses]
     ttcs = [nm['ttc'] for nm in near_misses if nm['ttc'] is not None]
     
-    # 创建图表
+    # Create figure with 4 subplots
     fig, axes = plt.subplots(2, 2, figsize=(12, 10))
     
-    # 距离分布
+    # Subplot 1: Distance Distribution
     axes[0, 0].hist(distances, bins=30, color='skyblue', edgecolor='black')
     axes[0, 0].set_title('Distance Distribution', fontsize=12, fontweight='bold')
     axes[0, 0].set_xlabel('Distance (units)')
@@ -143,7 +214,7 @@ def create_summary_plot(near_misses_path, output_dir):
     axes[0, 0].axvline(sum(distances)/len(distances), color='red', linestyle='--', label='Mean')
     axes[0, 0].legend()
     
-    # TTC分布
+    # Subplot 2: TTC Distribution
     if ttcs:
         axes[0, 1].hist(ttcs, bins=30, color='lightcoral', edgecolor='black')
         axes[0, 1].set_title('TTC Distribution', fontsize=12, fontweight='bold')
@@ -152,7 +223,7 @@ def create_summary_plot(near_misses_path, output_dir):
         axes[0, 1].axvline(2.0, color='red', linestyle='--', label='Warning threshold')
         axes[0, 1].legend()
     
-    # 接触点类型分布
+    # Subplot 3: Contact Point Type Distribution
     point_type_stats = defaultdict(int)
     for event in near_misses:
         if 'closest_point_pair' in event:
@@ -167,7 +238,7 @@ def create_summary_plot(near_misses_path, output_dir):
         axes[1, 0].set_ylabel('Count')
         axes[1, 0].tick_params(axis='x', rotation=45)
     
-    # 时间序列
+    # Subplot 4: Temporal Distribution
     timestamps = [nm['timestamp'] for nm in near_misses]
     axes[1, 1].scatter(timestamps, distances, alpha=0.6, s=30, color='purple')
     axes[1, 1].set_title('Near-miss Events Over Time', fontsize=12, fontweight='bold')

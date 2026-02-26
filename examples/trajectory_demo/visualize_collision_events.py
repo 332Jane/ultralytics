@@ -1,32 +1,76 @@
 """
 visualize_collision_events.py
 
-可视化碰撞事件在视频中的具体帧
-============================================
+================================================================================
+COLLISION EVENTS VISUALIZATION TOOL
+================================================================================
 
-功能：
-1. 加载near_misses.json（碰撞事件）
-2. 从原视频提取相应帧
-3. 在帧上绘制：
-   - YOLO检测框 + ID
-   - 接触点（3个点）
-   - 点之间的连线
-   - 距离值 + 接触类型
-4. 保存可视化结果（图片或视频）
+PURPOSE:
+  This script extracts and visualizes the most critical collision/near-miss
+  events from collision detection results. It creates annotated images showing:
+  1. YOLO detection boxes with object IDs
+  2. Contact points (3 points per object)
+  3. Distance measurements between contact points
+  4. TTC (Time-To-Collision) values and risk levels
 
-使用示例：
-python examples/trajectory_demo/visualize_collision_events.py \
-  --near-misses runs/trajectory_demo/xxx/near_misses.json \
-  --tracks runs/trajectory_demo/xxx/tracks.json \
-  --video videos/Homograph_Teset_FullScreen.mp4 \
-  --output collision_frames/ \
-  --top-k 10
+FUNCTIONALITY:
+  - Loads collision events from JSON file
+  - Extracts object trajectories from tracks JSON
+  - Sorts events by risk level (TTC priority, then distance)
+  - Visualizes top-K most critical events on video frames
+  - Annotates with:
+    * Detection boxes (blue for object 1, green for object 2)
+    * Contact points (3 points: front, center, back)
+    * Distance and TTC values
+    * Risk level classification (CRITICAL/HIGH/MEDIUM)
+  - Saves annotated frames as JPEG images
+  - Generates summary report
 
-输出：
-  collision_frames/
-  ├─ collision_event_001_frame_45_obj1_vs_obj2.jpg
-  ├─ collision_event_002_frame_78_obj3_vs_obj5.jpg
-  └─ collision_summary.txt
+USAGE:
+  Basic usage:
+    python examples/trajectory_demo/visualize_collision_events.py \\
+      --near-misses results/xxx/5_collision_analysis/collision_events.json \\
+      --tracks results/xxx/5_collision_analysis/tracks.json \\
+      --video videos/input_video.mp4 \\
+      --output collision_frames/ \\
+      --top-k 10
+
+  Custom filtering:
+    python visualize_collision_events.py \\
+      --near-misses near_misses.json \\
+      --tracks tracks.json \\
+      --video video.mp4 \\
+      --output output/ \\
+      --top-k 5
+
+PARAMETERS:
+  --near-misses <path>     : Path to collision events JSON file (REQUIRED)
+  --tracks <path>          : Path to object trajectories JSON file (REQUIRED)
+  --video <path>           : Path to input video file (REQUIRED)
+  --output <path>          : Output directory for annotated frames
+                             (Default: collision_frames/)
+  --top-k <int>            : Number of most critical events to visualize
+                             (Default: 10)
+
+OUTPUT:
+  Directory structure:
+    output/
+    ├── collision_event_001_frame_45_obj1_vs_obj2_CRITICAL.jpg
+    ├── collision_event_002_frame_78_obj3_vs_obj5_HIGH.jpg
+    ├── collision_event_003_frame_112_obj2_vs_obj4_MEDIUM.jpg
+    └── collision_summary.txt
+
+RISK LEVELS:
+  CRITICAL: TTC < 0.5s   (imminent collision)
+  HIGH:     TTC < 2.0s   (high risk)
+  MEDIUM:   TTC >= 2.0s  (moderate risk)
+
+COLOR CODING:
+  Blue:   Object 1 (box + contact points)
+  Green:  Object 2 (box + contact points)
+  Yellow: Distance and TTC labels
+
+================================================================================
 """
 
 import json
@@ -39,7 +83,7 @@ import math
 
 
 def load_data(near_misses_path, tracks_path):
-    """加载近miss事件和轨迹数据"""
+    """Load collision events and object trajectory data from JSON files"""
     with open(near_misses_path, 'r') as f:
         near_misses = json.load(f)
     with open(tracks_path, 'r') as f:
@@ -48,13 +92,13 @@ def load_data(near_misses_path, tracks_path):
 
 
 def get_object_info_at_frame(tracks, obj_id, frame_num):
-    """获取指定物体在某一帧的信息"""
+    """Retrieve object information at a specific frame number"""
     if str(obj_id) not in tracks:
         return None
     
     trajectory = tracks[str(obj_id)]
     
-    # 找到时间戳最接近frame_num的记录
+    # Find the sample with closest timestamp to frame_num
     best_sample = None
     min_diff = float('inf')
     
@@ -68,17 +112,17 @@ def get_object_info_at_frame(tracks, obj_id, frame_num):
 
 
 def draw_detection_box(frame, sample, obj_id, color=(0, 255, 0)):
-    """在帧上绘制YOLO检测框"""
+    """Draw YOLO detection box with object ID label on frame"""
     if sample is None or sample.get('bbox') is None:
         return frame
     
     x1, y1, x2, y2 = sample['bbox']
     x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
     
-    # 绘制检测框
+    # Draw detection box
     cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
     
-    # 绘制ID标签
+    # Draw ID label
     label = f"ID:{obj_id}"
     cv2.putText(frame, label, (x1, y1-10),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
@@ -87,29 +131,29 @@ def draw_detection_box(frame, sample, obj_id, color=(0, 255, 0)):
 
 
 def draw_contact_points(frame, sample, obj_id, color=(0, 255, 0), alpha=0.7):
-    """在帧上绘制接触点"""
+    """Draw contact points (front, center, back) on frame"""
     if sample is None or sample.get('contact_points_pixel') is None:
         return frame
     
     points = sample['contact_points_pixel']
     point_names = ['front', 'center', 'back']
     
-    # 创建一个透明层用于绘制
+    # Create transparent layer for drawing
     overlay = frame.copy()
     
     for i, (x, y) in enumerate(points):
         x, y = int(x), int(y)
         
-        # 绘制圆形（接触点）
+        # Draw circle (contact point)
         cv2.circle(overlay, (x, y), 8, color, -1)
-        cv2.circle(frame, (x, y), 8, color, 2)  # 外框
+        cv2.circle(frame, (x, y), 8, color, 2)  # Outer outline
         
-        # 标注点的名字
+        # Label point name
         label = point_names[i]
         cv2.putText(frame, label, (x+15, y-10),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
     
-    # 绘制三个点之间的连线
+    # Draw lines connecting the three points
     for i in range(len(points) - 1):
         x1, y1 = int(points[i][0]), int(points[i][1])
         x2, y2 = int(points[i+1][0]), int(points[i+1][1])
@@ -119,9 +163,9 @@ def draw_contact_points(frame, sample, obj_id, color=(0, 255, 0), alpha=0.7):
 
 
 def draw_collision_info(frame, near_miss_event, obj1_sample, obj2_sample, fps=30.0):
-    """在帧上绘制碰撞信息（距离、TTC、接触类型）"""
+    """Draw collision information (distance, TTC, contact type) on frame"""
     
-    # 右上角显示碰撞信息
+    # Information lines to display
     info_lines = []
     
     obj1_id = near_miss_event['id1']
@@ -148,19 +192,19 @@ def draw_collision_info(frame, near_miss_event, obj1_sample, obj2_sample, fps=30
             risk_level = "MEDIUM"
         info_lines.append(f"Risk: {risk_level}")
     
-    # 绘制信息文本（右上角）
+    # Draw information text in top-right corner
     h, w = frame.shape[:2]
     x_offset = w - 350
     y_offset = 30
     line_height = 30
     
-    # 背景矩形
+    # Background rectangle
     box_height = len(info_lines) * line_height + 20
     cv2.rectangle(frame, (x_offset - 10, y_offset - 20),
                   (w - 10, y_offset + box_height),
                   (0, 0, 0), -1)
     
-    # 文字
+    # Draw text
     for i, line in enumerate(info_lines):
         color = (0, 0, 255) if "CRITICAL" in line or "HIGH" in line else (0, 255, 255)
         cv2.putText(frame, line, (x_offset, y_offset + i * line_height),
@@ -171,29 +215,29 @@ def draw_collision_info(frame, near_miss_event, obj1_sample, obj2_sample, fps=30
 
 def visualize_collision_events(video_path, near_misses, tracks, output_dir, top_k=10):
     """
-    提取并可视化最严重的碰撞事件帧
+    Extract and visualize the most critical collision events
     
-    参数：
-    - video_path: 原视频路径
-    - near_misses: 碰撞事件列表
-    - tracks: 轨迹数据
-    - output_dir: 输出目录
-    - top_k: 提取最严重的前k个事件
+    Parameters:
+      video_path: Path to input video file
+      near_misses: List of collision events
+      tracks: Object trajectory data
+      output_dir: Output directory for annotated frames
+      top_k: Number of top events to visualize (sorted by risk level)
     """
     
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    # 打开视频
+    # Open video
     cap = cv2.VideoCapture(video_path)
     fps = cap.get(cv2.CAP_PROP_FPS)
     
-    # 按危险程度排序（TTC越小越危险）
+    # Sort events by risk level (TTC first, then distance)
     sorted_events = sorted(
         near_misses,
         key=lambda x: (
             x.get('ttc') if x.get('ttc') is not None else float('inf'),
-            -x['distance']  # 同TTC下，距离越小越危险
+            -x['distance']  # Same TTC: prioritize smaller distances
         )
     )
     
@@ -210,7 +254,7 @@ def visualize_collision_events(video_path, near_misses, tracks, output_dir, top_
         distance = event['distance']
         ttc = event['ttc']
         
-        # 读取帧
+        # Read frame
         cap.set(cv2.CAP_PROP_POS_FRAMES, frame_num)
         ret, frame = cap.read()
         
@@ -218,24 +262,24 @@ def visualize_collision_events(video_path, near_misses, tracks, output_dir, top_
             print(f"⚠ Cannot read frame {frame_num}")
             continue
         
-        # 获取两个物体的信息
+        # Get object information
         obj1_sample = get_object_info_at_frame(tracks, obj1_id, frame_num)
         obj2_sample = get_object_info_at_frame(tracks, obj2_id, frame_num)
         
-        # 绘制物体1（蓝色）
+        # Draw object 1 (blue)
         if obj1_sample:
             frame = draw_detection_box(frame, obj1_sample, obj1_id, color=(255, 0, 0))
             frame = draw_contact_points(frame, obj1_sample, obj1_id, color=(255, 0, 0))
         
-        # 绘制物体2（绿色）
+        # Draw object 2 (green)
         if obj2_sample:
             frame = draw_detection_box(frame, obj2_sample, obj2_id, color=(0, 255, 0))
             frame = draw_contact_points(frame, obj2_sample, obj2_id, color=(0, 255, 0))
         
-        # 绘制碰撞信息
+        # Draw collision information
         frame = draw_collision_info(frame, event, obj1_sample, obj2_sample, fps)
         
-        # 保存帧
+        # Save frame
         risk_level = "CRITICAL" if ttc and ttc < 0.5 else ("HIGH" if ttc and ttc < 2.0 else "MED")
         output_filename = (
             f"collision_event_{event_idx+1:03d}_"
@@ -247,7 +291,7 @@ def visualize_collision_events(video_path, near_misses, tracks, output_dir, top_
         cv2.imwrite(str(output_path), frame)
         saved_frames.append(output_path)
         
-        # 打印信息
+        # Print information
         ttc_str = f"{ttc:.2f}s" if ttc is not None else "N/A"
         print(f"✓ Event {event_idx+1}:")
         print(f"    Frame {frame_num} | Object {obj1_id} <-> {obj2_id}")
@@ -260,7 +304,7 @@ def visualize_collision_events(video_path, near_misses, tracks, output_dir, top_
     
     cap.release()
     
-    # 生成总结报告
+    # Generate summary report
     summary_path = output_dir / "collision_summary.txt"
     with open(summary_path, 'w') as f:
         f.write("=" * 60 + "\n")
@@ -288,16 +332,16 @@ def visualize_collision_events(video_path, near_misses, tracks, output_dir, top_
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Visualize collision events on video frames')
-    parser.add_argument('--near-misses', required=True, help='Path to near_misses.json')
-    parser.add_argument('--tracks', required=True, help='Path to tracks.json')
-    parser.add_argument('--video', required=True, help='Path to video file')
-    parser.add_argument('--output', default='collision_frames', help='Output directory')
-    parser.add_argument('--top-k', type=int, default=10, help='Number of top events to visualize')
+    parser.add_argument('--near-misses', required=True, help='Path to collision events JSON file')
+    parser.add_argument('--tracks', required=True, help='Path to object trajectories JSON file')
+    parser.add_argument('--video', required=True, help='Path to input video file')
+    parser.add_argument('--output', default='collision_frames', help='Output directory for annotated frames')
+    parser.add_argument('--top-k', type=int, default=10, help='Number of top critical events to visualize')
     
     args = parser.parse_args()
     
-    # 加载数据
+    # Load data
     near_misses, tracks = load_data(args.near_misses, args.tracks)
     
-    # 可视化碰撞事件
+    # Visualize collision events
     visualize_collision_events(args.video, near_misses, tracks, args.output, args.top_k)

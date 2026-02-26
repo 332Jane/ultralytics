@@ -15,6 +15,12 @@ IMPLEMENTATION_*.md
 IMPROVEMENT_*.md
 ANALYSIS_*.md
 
+# Reference data and reports (local only)
+PPT_*.txt
+QUICK_*.txt
+YOLO_*.txt
+MENTOR_*.md
+
 # Temporary documentation files in examples/trajectory_demo
 examples/trajectory_demo/*.md
 !examples/trajectory_demo/README.md
